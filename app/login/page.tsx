@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase';
 
 export default function LoginPage() {
+  const [modo, setModo] = useState<'crianca' | 'responsavel'>('crianca');
+  const [crianca, setCrianca] = useState<'zon' | 'ettore'>('zon');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -16,10 +18,13 @@ export default function LoginPage() {
     setCarregando(true);
     setErro(null);
     const supabase = supabaseBrowser();
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: modo === 'crianca' ? `${crianca}@mesada.app` : email,
+      password: senha,
+    });
     setCarregando(false);
     if (error) {
-      setErro('E-mail ou senha inválidos.');
+      setErro(modo === 'crianca' ? 'Senha incorreta.' : 'E-mail ou senha inválidos.');
       return;
     }
     router.push('/dashboard');
@@ -29,15 +34,38 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <form onSubmit={entrar} className="w-full max-w-sm space-y-4 rounded-2xl bg-slate-900 p-8 shadow-xl">
         <h1 className="text-xl font-semibold text-center">Entrar — Mesada</h1>
-        <p className="text-sm text-slate-400 text-center">Responsáveis e crianças</p>
-        <input
-          type="email"
-          required
-          placeholder="E-mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg bg-slate-800 px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <p className="text-sm text-slate-400 text-center">Escolha quem é você</p>
+        <div className="flex rounded-lg bg-slate-800 p-1">
+          <button type="button" onClick={() => setModo('crianca')} className={`flex-1 rounded-md py-2 text-sm font-medium ${modo === 'crianca' ? 'bg-blue-600' : ''}`}>
+            Sou criança
+          </button>
+          <button type="button" onClick={() => setModo('responsavel')} className={`flex-1 rounded-md py-2 text-sm font-medium ${modo === 'responsavel' ? 'bg-blue-600' : ''}`}>
+            Sou responsável
+          </button>
+        </div>
+        {modo === 'crianca' ? (
+          <div className="flex gap-2">
+            {(['zon', 'ettore'] as const).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setCrianca(n)}
+                className={`flex-1 rounded-lg py-3 font-semibold capitalize ${crianca === n ? 'bg-blue-600' : 'bg-slate-800'}`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <input
+            type="email"
+            required
+            placeholder="E-mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg bg-slate-800 px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        )}
         <input
           type="password"
           required
