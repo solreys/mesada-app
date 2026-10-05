@@ -155,3 +155,14 @@ $$ language plpgsql security definer;
 create trigger trg_aplicar_transferencia
   after insert on transferencias_poupanca
   for each row execute function aplicar_transferencia();
+
+-- ============================================================
+-- Migração (out/2026): lançamentos de criança ficam pendentes até um responsável aprovar
+-- ============================================================
+-- create type status_lancamento as enum ('aprovado','pendente','rejeitado');
+-- alter table lancamentos add column status status_lancamento not null default 'aprovado';
+-- alter table lancamentos add column aprovado_por uuid references perfis(id);
+-- alter table lancamentos add column aprovado_em timestamptz;
+-- aplicar_lancamento(): só altera saldo se status = 'aprovado'
+-- trigger trg_aprovar_lancamento: pendente -> aprovado soma o valor ao saldo_mes
+-- policy escrita_crianca_pendente (insert pendente por criança) + atualiza_responsavel_lancamentos (update por responsável)

@@ -29,7 +29,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <form onSubmit={entrar} className="w-full max-w-sm space-y-4 rounded-2xl bg-slate-900 p-8 shadow-xl">
         <h1 className="text-xl font-semibold text-center">Entrar — Mesada</h1>
-        <p className="text-sm text-slate-400 text-center">Acesso dos responsáveis</p>
+        <p className="text-sm text-slate-400 text-center">Responsáveis e crianças</p>
         <input
           type="email"
           required

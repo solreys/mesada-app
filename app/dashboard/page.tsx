@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [saldos, setSaldos] = useState<Record<string, Saldo>>({});
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [papel, setPapel] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = supabaseBrowser();
@@ -41,6 +42,17 @@ export default function DashboardPage() {
     }
 
     carregar();
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (u.user) {
+        const { data: meu } = await supabase
+          .from('perfis')
+          .select('papel')
+          .eq('auth_user_id', u.user.id)
+          .maybeSingle();
+        setPapel(meu?.papel ?? null);
+      }
+    })();
 
     // Realtime: qualquer lançamento ou mudança de saldo atualiza o dashboard na hora,
     // em qualquer dispositivo conectado.
@@ -56,7 +68,10 @@ export default function DashboardPage() {
   }, [selecionado]);
 
   const criancaAtual = criancas.find((c) => c.id === selecionado);
-  const lancamentosCrianca = lancamentos.filter((l) => l.crianca_id === selecionado);
+  const lancamentosCrianca = lancamentos.filter(
+    (l) => l.crianca_id === selecionado && l.status === 'aprovado'
+  );
+  const pendentes = lancamentos.filter((l) => l.status === 'pendente');
 
   const pontosGrafico = [...lancamentosCrianca]
     .reverse()
@@ -75,6 +90,16 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold">Mesada Zon &amp; Ettore</h1>
         <p className="text-sm text-slate-400">Dashboard atualizado em tempo real</p>
       </header>
+
+      {pendentes.length > 0 && (
+        <a
+          href={papel === 'responsavel' ? '/aprovacoes' : '/lancamento'}
+          className="block rounded-xl bg-amber-900/40 border border-amber-700 px-4 py-3 text-sm text-amber-200"
+        >
+          {pendentes.length} lançamento(s) aguardando aprovação
+          {papel === 'responsavel' ? ' — toque para revisar →' : ''}
+        </a>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         {criancas.map((c) => {

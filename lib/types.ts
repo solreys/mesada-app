@@ -1,5 +1,6 @@
 export type Papel = 'responsavel' | 'crianca';
 export type CategoriaItem = 'punicao' | 'bonus';
+export type StatusLancamento = 'aprovado' | 'pendente' | 'rejeitado';
 
 export interface Perfil {
   id: string;
@@ -27,6 +28,9 @@ export interface Lancamento {
   valor: number;
   lancado_por: string;
   observacao: string | null;
+  status: StatusLancamento;
+  aprovado_por: string | null;
+  aprovado_em: string | null;
   criado_em: string;
 }
 

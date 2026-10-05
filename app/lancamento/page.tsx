@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase';
-import type { Perfil, ItemRegra } from '@/lib/types';
+import type { Perfil, ItemRegra, Papel } from '@/lib/types';
 import { formatarReal } from '@/lib/calculos';
 
 export default function LancamentoPage() {
@@ -14,6 +14,7 @@ export default function LancamentoPage() {
   const [aba, setAba] = useState<'punicao' | 'bonus'>('punicao');
   const [enviando, setEnviando] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
+  const [papel, setPapel] = useState<Papel | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -30,6 +31,15 @@ export default function LancamentoPage() {
         if (p.length > 0) setCriancaId(p[0].id);
       }
       if (i) setItens(i);
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        const { data: meu } = await supabase
+          .from('perfis')
+          .select('papel')
+          .eq('auth_user_id', userData.user.id)
+          .maybeSingle();
+        setPapel((meu?.papel as Papel) ?? null);
+      }
     })();
   }, []);
 
@@ -45,24 +55,26 @@ export default function LancamentoPage() {
     const { data: userData } = await supabase.auth.getUser();
     const { data: perfil } = await supabase
       .from('perfis')
-      .select('id')
+      .select('id, papel')
       .eq('auth_user_id', userData.user?.id)
       .single();
 
+    const pendente = perfil?.papel === 'crianca';
     const { error } = await supabase.from('lancamentos').insert({
       crianca_id: criancaId,
       item_id: item.id,
       descricao: item.descricao,
       valor: item.valor,
       lancado_por: perfil?.id,
+      status: pendente ? 'pendente' : 'aprovado',
     });
 
     setEnviando(false);
     if (error) {
-      setMensagem('Erro ao lançar. Confirme que está logado como responsável.');
+      setMensagem('Erro ao lançar. Entre com sua conta (responsável ou criança) e tente de novo.');
       return;
     }
-    setMensagem('Lançado com sucesso!');
+    setMensagem(pendente ? 'Enviado! Um responsável precisa aprovar.' : 'Lançado com sucesso!');
     setTimeout(() => router.push('/dashboard'), 800);
   }
 
@@ -74,6 +86,11 @@ export default function LancamentoPage() {
         <a href="/dashboard" className="text-slate-400">←</a>
         <h1 className="text-xl font-bold">Novo lançamento</h1>
       </header>
+      {papel === 'crianca' && (
+        <p className="rounded-lg bg-amber-900/40 border border-amber-700 px-3 py-2 text-sm text-amber-200">
+          Seus lançamentos ficam pendentes até um responsável aprovar.
+        </p>
+      )}
 
       <div>
         <label className="text-sm text-slate-400 mb-1 block">Criança</label>
@@ -135,7 +152,7 @@ export default function LancamentoPage() {
         disabled={!itemId || enviando}
         className="w-full rounded-lg bg-blue-600 py-3 font-semibold disabled:opacity-40"
       >
-        {enviando ? 'Lançando…' : 'Confirmar lançamento'}
+        {enviando ? 'Enviando…' : papel === 'crianca' ? 'Enviar para aprovação' : 'Confirmar lançamento'}
       </button>
     </main>
   );
