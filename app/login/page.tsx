@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase';
 
+const EMAIL_CRIANCA = {
+  zon: 'zon.reys@clq.g12.br',
+  ettore: 'ettore.reys@clq.g12.br',
+} as const;
+
 export default function LoginPage() {
   const [modo, setModo] = useState<'crianca' | 'responsavel'>('crianca');
   const [crianca, setCrianca] = useState<'zon' | 'ettore'>('zon');
@@ -19,7 +24,7 @@ export default function LoginPage() {
     setErro(null);
     const supabase = supabaseBrowser();
     const { error } = await supabase.auth.signInWithPassword({
-      email: modo === 'crianca' ? `${crianca}@mesada.app` : email,
+      email: modo === 'crianca' ? EMAIL_CRIANCA[crianca] : email,
       password: senha,
     });
     setCarregando(false);
