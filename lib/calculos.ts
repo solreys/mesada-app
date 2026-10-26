@@ -1,3 +1,43 @@
+// Valor com que cada criança começa o mês em saldo_mes.
+export const SALDO_INICIAL_MES = 120;
+
+export const CORES_CRIANCA: Record<string, string> = { Zon: '#2563eb', Ettore: '#16a34a' };
+
+// Início do mês e do mês seguinte (horário local, em ISO), para filtrar por criado_em.
+export function intervaloMes(mes: string): { inicio: string; fim: string } {
+  const [ano, m] = mes.split('-').map(Number);
+  return {
+    inicio: new Date(ano, m - 1, 1).toISOString(),
+    fim: new Date(ano, m, 1).toISOString(),
+  };
+}
+
+// 'AAAA-MM' do mês corrente.
+export function mesAtual(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// 'AAAA-MM' deslocado em n meses.
+export function somarMes(mes: string, n: number): string {
+  const [ano, m] = mes.split('-').map(Number);
+  const d = new Date(ano, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function nomeMes(mes: string): string {
+  const [ano, m] = mes.split('-').map(Number);
+  const nome = new Date(ano, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return nome.charAt(0).toUpperCase() + nome.slice(1);
+}
+
+// Converte "1,50", "-2", "R$ 1.234,00" ou "1.5" em número. Retorna NaN se inválido.
+export function lerValor(texto: string): number {
+  let limpo = texto.replace(/R\$|\s/g, '');
+  if (limpo.includes(',')) limpo = limpo.replace(/\./g, '').replace(',', '.');
+  return limpo === '' ? NaN : Number(limpo);
+}
+
 export function formatarReal(valor: number): string {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
