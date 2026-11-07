@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
-import type { Perfil, Saldo, Lancamento, Fechamento, ItemRegra, Meta } from '@/lib/types';
+import type { Perfil, Saldo, Lancamento, Fechamento, ItemRegra, Meta, ObjetivoPoupanca } from '@/lib/types';
 import SaldoCard from '@/components/SaldoCard';
 import ExtratoTable from '@/components/ExtratoTable';
 import GraficoEvolucao from '@/components/GraficoEvolucao';
 import RankingCard from '@/components/RankingCard';
 import PendentesLista from '@/components/PendentesLista';
 import MetasCard from '@/components/MetasCard';
+import ObjetivoCard from '@/components/ObjetivoCard';
+import CalendarioMes from '@/components/CalendarioMes';
 import { progresso } from '@/lib/metas';
 import {
   CORES_CRIANCA,
@@ -39,8 +41,14 @@ export default function DashboardPage() {
   const [anteriorFechado, setAnteriorFechado] = useState(true);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [itens, setItens] = useState<ItemRegra[]>([]);
+  const [objetivos, setObjetivos] = useState<Record<string, ObjetivoPoupanca>>({});
+  const [fechHist, setFechHist] = useState<Fechamento[]>([]);
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [mes, setMes] = useState(mesAtual());
+  const [diaSel, setDiaSel] = useState<number | null>(null);
+
+  // Ao trocar de mês ou de criança, limpa o filtro de dia do calendário.
+  useEffect(() => setDiaSel(null), [mes, selecionado]);
 
   const souCrianca = perfil?.papel === 'crianca';
   const souResponsavel = perfil?.papel === 'responsavel';
@@ -51,7 +59,7 @@ export default function DashboardPage() {
     const { inicio, fim } = intervaloMes(mes);
     const anterior = primeiroDia(somarMes(mesAtual(), -1));
     // O banco (RLS) já devolve só os dados da própria criança quando ela está logada.
-    const [perfis, saldosData, lancData, pendData, rank, fech, fechAnt, metasData, itensData] = await Promise.all([
+    const [perfis, saldosData, lancData, pendData, rank, fech, fechAnt, metasData, itensData, objData, histData] = await Promise.all([
       supabase.from('perfis').select('*').eq('papel', 'crianca').order('nome', { ascending: false }),
       supabase.from('saldos').select('*'),
       supabase
@@ -67,7 +75,11 @@ export default function DashboardPage() {
       supabase.from('fechamentos_mensais').select('id', { count: 'exact', head: true }).eq('mes_referencia', anterior),
       supabase.from('metas').select('*').eq('ativo', true),
       supabase.from('itens_regras').select('*'),
+      supabase.from('objetivos_poupanca').select('*').eq('ativo', true),
+      supabase.from('fechamentos_mensais').select('*').order('mes_referencia', { ascending: false }).limit(12),
     ]);
+    setObjetivos(Object.fromEntries((objData.data ?? []).map((o) => [o.crianca_id, o])));
+    setFechHist(histData.data ?? []);
     if (metasData.data) setMetas(metasData.data);
     if (itensData.data) setItens(itensData.data);
 
@@ -103,6 +115,7 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'saldos' }, carregar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fechamentos_mensais' }, carregar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'metas' }, carregar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'objetivos_poupanca' }, carregar)
       .subscribe();
     return () => {
       supabase.removeChannel(canal);
@@ -120,6 +133,15 @@ export default function DashboardPage() {
   const somaMes = (id: string) =>
     lancamentos.filter((l) => l.crianca_id === id).reduce((acc, l) => acc + Number(l.valor), 0);
   const ehMesAtual = mes === mesAtual();
+  const extrato = diaSel
+    ? lancamentosCrianca.filter((l) => new Date(l.criado_em).getDate() === diaSel)
+    : lancamentosCrianca;
+  // Quanto entrou na poupança por mês, em média, nos últimos 3 fechamentos (sobra/desconto + rendimento).
+  const ritmoPoupanca = (id: string): number | null => {
+    const ult = fechHist.filter((f) => f.crianca_id === id).slice(0, 3);
+    if (ult.length === 0) return null;
+    return ult.reduce((a, f) => a + Number(f.valor_para_poupanca) + Number(f.rendimento), 0) / ult.length;
+  };
   const mesAnterior = somarMes(mesAtual(), -1);
 
   // Evolução diária: começa o mês em R$ 120 e acumula os lançamentos aprovados de cada dia.
@@ -195,6 +217,7 @@ export default function DashboardPage() {
                       : undefined
                 }
                 corAccent={CORES_CRIANCA[c.nome] ?? '#64748b'}
+                mostrarBarra={ehMesAtual && !f}
               />
             </button>
           );
@@ -211,6 +234,18 @@ export default function DashboardPage() {
         }))}
       />
 
+      {criancaAtual && (
+        <ObjetivoCard
+          criancaId={criancaAtual.id}
+          nome={criancaAtual.nome}
+          objetivo={objetivos[criancaAtual.id] ?? null}
+          poupanca={Number(saldos[criancaAtual.id]?.saldo_poupanca ?? 0)}
+          ritmoMensal={ritmoPoupanca(criancaAtual.id)}
+          podeEditar={souResponsavel || perfil.id === criancaAtual.id}
+          onMudou={carregar}
+        />
+      )}
+
       {criancaAtual && !fechamentos[criancaAtual.id] && (
         <MetasCard
           nome={criancaAtual.nome}
@@ -225,6 +260,10 @@ export default function DashboardPage() {
         >
           📄 Ver relatório de {nomeMes(mes)} →
         </a>
+      )}
+
+      {criancaAtual && (
+        <CalendarioMes mes={mes} lancamentos={lancamentosCrianca} selecionado={diaSel} onSelecionar={setDiaSel} />
       )}
 
       {criancaAtual && (
@@ -245,9 +284,15 @@ export default function DashboardPage() {
 
       <section className="rounded-2xl bg-slate-900 p-5 shadow-lg border border-slate-800">
         <h3 className="text-sm uppercase tracking-wide text-slate-400 mb-3">
-          Extrato — {criancaAtual?.nome ?? ''} · {lancamentosCrianca.length} lançamento(s)
+          Extrato — {criancaAtual?.nome ?? ''}
+          {diaSel ? ` · dia ${String(diaSel).padStart(2, '0')}/${m}` : ''} · {extrato.length} lançamento(s)
         </h3>
-        <ExtratoTable lancamentos={lancamentosCrianca} />
+        {diaSel && (
+          <button onClick={() => setDiaSel(null)} className="mb-2 rounded-lg bg-slate-800 px-3 py-1 text-xs">
+            Ver o mês todo ✕
+          </button>
+        )}
+        <ExtratoTable lancamentos={extrato} />
       </section>
     </main>
   );

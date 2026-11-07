@@ -110,3 +110,14 @@ export interface MetaResultado {
   cumprida: boolean;
   bonus: number;
 }
+
+export interface ObjetivoPoupanca {
+  id: string;
+  crianca_id: string;
+  nome: string;
+  icone: string | null;
+  valor_alvo: number;
+  ativo: boolean;
+  criado_em: string;
+  concluido_em: string | null;
+}
