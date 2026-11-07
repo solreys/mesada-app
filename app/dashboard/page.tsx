@@ -134,7 +134,7 @@ export default function DashboardPage() {
     lancamentos.filter((l) => l.crianca_id === id).reduce((acc, l) => acc + Number(l.valor), 0);
   const ehMesAtual = mes === mesAtual();
   const extrato = diaSel
-    ? lancamentosCrianca.filter((l) => new Date(l.criado_em).getDate() === diaSel)
+    ? lancamentosCrianca.filter((l) => new Date(l.ocorrido_em ?? l.criado_em).getDate() === diaSel)
     : lancamentosCrianca;
   // Quanto entrou na poupança por mês, em média, nos últimos 3 fechamentos (sobra/desconto + rendimento).
   const ritmoPoupanca = (id: string): number | null => {

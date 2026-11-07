@@ -13,6 +13,7 @@ import {
   padroes,
   porArea,
   projecaoMes,
+  punicoesJuntas,
   tendencias,
   totais,
 } from '@/lib/analise';
@@ -63,7 +64,7 @@ export default function AnalisePage() {
         buscarTudo<Lanc>((de, ate) =>
           supabase
             .from('lancamentos')
-            .select('crianca_id, item_id, descricao, valor, criado_em')
+            .select('crianca_id, item_id, descricao, valor, criado_em, ocorrido_em')
             .eq('status', 'aprovado')
             .order('criado_em')
             .range(de, ate)
@@ -102,6 +103,7 @@ export default function AnalisePage() {
   const melhorando = tend.filter((t) => t.melhora > 0).sort((a, b) => b.melhora - a.melhora).slice(0, 5);
   const piorando = tend.filter((t) => t.melhora < 0).sort((a, b) => a.melhora - b.melhora).slice(0, 5);
 
+  const juntas = punicoesJuntas(noIntervalo(meus, inicio, fim), itens).slice(0, 5);
   const areas = porArea(atual, anterior);
   const maxArea = Math.max(1, ...areas.map((a) => Math.max(a.punicoes, a.bonus)));
 
@@ -145,6 +147,9 @@ export default function AnalisePage() {
     sugestoes.push(
       `“${p.nome}” é a punição mais frequente: ${p.qtd}× em ${janela} dias (${share}% das punições, ${formatarReal(p.valor)}). Bom ponto para uma conversa ou um combinado específico.`
     );
+  }
+  if (juntas[0] && juntas[0].juntos >= 3) {
+    sugestoes.push(`“${juntas[0].a}” e “${juntas[0].b}” aconteceram no mesmo dia ${juntas[0].juntos} vezes. Vale olhar o que há em comum nesses dias.`);
   }
   if (areas[0]?.punicoes >= 3) {
     sugestoes.push(`A área com mais punições é ${areas[0].area} (${areas[0].punicoes}×, ${formatarReal(areas[0].punicoesValor)}).`);
@@ -345,6 +350,35 @@ export default function AnalisePage() {
           ))}
         </section>
       )}
+
+      {/* Punições que andam juntas */}
+      <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
+        <h3 className="text-sm uppercase tracking-wide text-slate-400">Punições que andam juntas</h3>
+        {juntas.length === 0 ? (
+          <p className="text-sm text-slate-500">Nenhuma dupla se repetiu em 2 dias ou mais no período.</p>
+        ) : (
+          <ul className="space-y-2">
+            {juntas.map((p) => (
+              <li key={`${p.a}|${p.b}`} className="text-sm leading-snug">
+                <span>
+                  {p.iconeA} {p.a}
+                </span>
+                <span className="text-slate-500"> + </span>
+                <span>
+                  {p.iconeB} {p.b}
+                </span>
+                <span className="block text-xs text-slate-400">
+                  juntas em <strong className="text-red-400">{p.juntos}</strong> dia(s) · “{p.a.split(' ').slice(0, 3).join(' ')}…” teve {p.diasA}{' '}
+                  dia(s), “{p.b.split(' ').slice(0, 3).join(' ')}…” teve {p.diasB}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-[11px] text-slate-500">
+          Mesma criança, mesmo dia. Pode indicar uma causa comum (ex.: cansaço, horário, conflito). É coincidência no dia, não prova de causa.
+        </p>
+      </section>
 
       {/* Tendência */}
       <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4">
