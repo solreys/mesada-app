@@ -15,6 +15,7 @@ import {
   somarMes,
 } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
+import AbasHistorico from '@/components/AbasHistorico';
 
 type Lanc = Pick<Lancamento, 'crianca_id' | 'item_id' | 'descricao' | 'valor' | 'criado_em'>;
 type Periodo = 6 | 12 | 0; // 0 = tudo
@@ -158,7 +159,7 @@ export default function HistoricoPage() {
   return (
     <main className="max-w-3xl mx-auto p-4 pb-28 space-y-5">
       <header className="pt-4 space-y-3">
-        <h1 className="text-xl font-bold">Histórico</h1>
+        <AbasHistorico ativa="historico" />
         {!souCrianca && (
           <div className="flex gap-2">
             {[{ id: 'todos', nome: 'Os dois' }, ...visiveis].map((c) => (
