@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
 import type { Fechamento, Lancamento, Perfil, Saldo } from '@/lib/types';
 import {
+  PRIMEIRO_MES_FECHAMENTO,
   SALDO_INICIAL_MES,
   formatarReal,
   intervaloMes,
@@ -99,7 +100,7 @@ export default function FechamentoPage() {
     carregar();
   }
 
-  const opcoesMes = [1, 2, 3].map((n) => somarMes(mesAtual(), -n));
+  const opcoesMes = [1, 2, 3].map((n) => somarMes(mesAtual(), -n)).filter((m) => m >= PRIMEIRO_MES_FECHAMENTO);
 
   return (
     <main className="max-w-lg mx-auto p-4 pb-28 space-y-5">

@@ -1,3 +1,6 @@
+// Primeiro mês fechado pelo app (até setembro/2026 a virada foi manual).
+export const PRIMEIRO_MES_FECHAMENTO = '2026-10';
+
 // Valor com que cada criança começa o mês em saldo_mes.
 export const SALDO_INICIAL_MES = 120;
 

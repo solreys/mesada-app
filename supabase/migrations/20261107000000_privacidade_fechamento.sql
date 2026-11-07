@@ -191,6 +191,10 @@ begin
   if v_mes >= v_atual then
     raise exception 'Só é possível fechar um mês que já terminou.';
   end if;
+  -- Até setembro/2026 a virada foi feita à mão no SQL Editor; fechar de novo duplicaria a sobra.
+  if v_mes < date '2026-10-01' then
+    raise exception 'Meses antes de outubro/2026 já foram fechados manualmente.';
+  end if;
   if p_cdi_pct is null or p_cdi_pct < 0 or p_cdi_pct > 5 then
     raise exception 'Taxa CDI inválida (use %% ao mês, ex.: 1,08).';
   end if;
