@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
-import type { Fechamento, Lancamento, Perfil, Saldo } from '@/lib/types';
+import type { Fechamento, ItemRegra, Lancamento, Meta, Perfil, Saldo } from '@/lib/types';
+import { progresso } from '@/lib/metas';
 import {
   PRIMEIRO_MES_FECHAMENTO,
   SALDO_INICIAL_MES,
@@ -34,6 +35,8 @@ export default function FechamentoPage() {
   const [historico, setHistorico] = useState<Fechamento[]>([]);
   const [cdi, setCdi] = useState('');
   const [rendimentoJaAplicado, setRendimentoJaAplicado] = useState(false);
+  const [metas, setMetas] = useState<Meta[]>([]);
+  const [itens, setItens] = useState<ItemRegra[]>([]);
   const [destinos, setDestinos] = useState<Record<string, Destino>>({});
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{ texto: string; erro?: boolean } | null>(null);
@@ -43,14 +46,18 @@ export default function FechamentoPage() {
   const carregar = useCallback(async () => {
     const supabase = supabaseBrowser();
     const { inicio, fim } = intervaloMes(mes);
-    const [p, s, l, h, cfg, rend] = await Promise.all([
+    const [p, s, l, h, cfg, rend, mt, it] = await Promise.all([
       supabase.from('perfis').select('*').eq('papel', 'crianca').order('nome', { ascending: false }),
       supabase.from('saldos').select('*'),
       supabase.from('lancamentos').select('*').neq('status', 'rejeitado').gte('criado_em', inicio).lt('criado_em', fim),
       supabase.from('fechamentos_mensais').select('*').order('mes_referencia', { ascending: false }).limit(24),
       supabase.from('config_financeira').select('*').eq('mes_referencia', proximo).maybeSingle(),
       supabase.from('rendimentos_historico').select('id', { count: 'exact', head: true }).eq('mes_referencia', proximo),
+      supabase.from('metas').select('*').eq('ativo', true),
+      supabase.from('itens_regras').select('*'),
     ]);
+    setMetas(mt.data ?? []);
+    setItens(it.data ?? []);
     if (p.data) setCriancas(p.data);
     if (s.data) setSaldos(Object.fromEntries(s.data.map((x) => [x.crianca_id, x])));
     if (l.data) setLancs(l.data);
@@ -73,13 +80,15 @@ export default function FechamentoPage() {
     const aprovados = lancs.filter((l) => l.crianca_id === c.id && l.status === 'aprovado');
     const bonus = aprovados.filter((l) => l.valor > 0).reduce((a, l) => a + Number(l.valor), 0);
     const punicoes = aprovados.filter((l) => l.valor < 0).reduce((a, l) => a + Number(l.valor), 0);
-    const final = SALDO_INICIAL_MES + bonus + punicoes;
+    const metasCrianca = progresso(metas, lancs, new Map(itens.map((i) => [i.id, i])), c.id, mes);
+    const bonusMetas = metasCrianca.filter((m) => m.ok).reduce((a, m) => a + Number(m.meta.bonus), 0);
+    const final = SALDO_INICIAL_MES + bonus + punicoes + bonusMetas;
     const poupanca = Number(saldos[c.id]?.saldo_poupanca ?? 0);
     const rendimento =
       !rendimentoJaAplicado && taxaOk && poupanca > 0 ? Number((poupanca * (taxa / 100)).toFixed(2)) : 0;
     const destino: Destino | 'debito_poupanca' = final < 0 ? 'debito_poupanca' : destinos[c.id] ?? 'poupanca';
     const para = destino === 'pago' ? 0 : final;
-    return { c, bonus, punicoes, final, poupanca, rendimento, destino, depois: poupanca + rendimento + para };
+    return { c, bonus, punicoes, metasCrianca, bonusMetas, final, poupanca, rendimento, destino, depois: poupanca + rendimento + para };
   });
 
   async function fechar() {
@@ -96,7 +105,7 @@ export default function FechamentoPage() {
       p_destinos: destinos,
     });
     setSalvando(false);
-    setMensagem(error ? { texto: error.message, erro: true } : { texto: `${nomeMes(mes)} fechado.` });
+    setMensagem(error ? { texto: error.message, erro: true } : { texto: `${nomeMes(mes)} fechado. O relatório está na lista abaixo.` });
     carregar();
   }
 
@@ -171,7 +180,17 @@ export default function FechamentoPage() {
                     </div>
                     <p className="text-xs text-slate-400">
                       {formatarReal(SALDO_INICIAL_MES)} · bônus {formatarReal(p.bonus)} · punições {formatarReal(p.punicoes)}
+                      {p.metasCrianca.length > 0 && ` · metas ${formatarReal(p.bonusMetas)}`}
                     </p>
+                    {p.metasCrianca.length > 0 && (
+                      <ul className="text-xs space-y-0.5">
+                        {p.metasCrianca.map((m) => (
+                          <li key={m.meta.id} className={m.ok ? 'text-emerald-400' : 'text-slate-500'}>
+                            {m.ok ? '✓' : '✗'} {m.alvo.texto} ({m.feito}/{m.meta.limite}){m.ok ? ` +${formatarReal(Number(m.meta.bonus))}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     {p.destino === 'debito_poupanca' ? (
                       <p className="text-xs text-red-300">Saldo negativo: {formatarReal(p.final)} sai da poupança.</p>
                     ) : (
@@ -226,7 +245,11 @@ export default function FechamentoPage() {
               <tbody>
                 {historico.map((f) => (
                   <tr key={f.id} className="border-b border-slate-800/60">
-                    <td className="py-1.5 pr-2 text-slate-400 whitespace-nowrap">{nomeMes(f.mes_referencia.slice(0, 7))}</td>
+                    <td className="py-1.5 pr-2 whitespace-nowrap">
+                      <a href={`/relatorio?mes=${f.mes_referencia.slice(0, 7)}`} className="text-blue-300 underline">
+                        {nomeMes(f.mes_referencia.slice(0, 7))}
+                      </a>
+                    </td>
                     <td className="py-1.5 pr-2">{criancas.find((c) => c.id === f.crianca_id)?.nome ?? '—'}</td>
                     <td className={`py-1.5 pr-2 text-right whitespace-nowrap ${f.saldo_final < 0 ? 'text-red-400' : ''}`}>
                       {formatarReal(Number(f.saldo_final))}

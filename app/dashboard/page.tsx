@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
-import type { Perfil, Saldo, Lancamento, Fechamento } from '@/lib/types';
+import type { Perfil, Saldo, Lancamento, Fechamento, ItemRegra, Meta } from '@/lib/types';
 import SaldoCard from '@/components/SaldoCard';
 import ExtratoTable from '@/components/ExtratoTable';
 import GraficoEvolucao from '@/components/GraficoEvolucao';
 import RankingCard from '@/components/RankingCard';
 import PendentesLista from '@/components/PendentesLista';
+import MetasCard from '@/components/MetasCard';
+import { progresso } from '@/lib/metas';
 import {
   CORES_CRIANCA,
   SALDO_INICIAL_MES,
@@ -35,6 +37,8 @@ export default function DashboardPage() {
   const [ranking, setRanking] = useState<LinhaRanking[]>([]);
   const [fechamentos, setFechamentos] = useState<Record<string, Fechamento>>({});
   const [anteriorFechado, setAnteriorFechado] = useState(true);
+  const [metas, setMetas] = useState<Meta[]>([]);
+  const [itens, setItens] = useState<ItemRegra[]>([]);
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [mes, setMes] = useState(mesAtual());
 
@@ -47,7 +51,7 @@ export default function DashboardPage() {
     const { inicio, fim } = intervaloMes(mes);
     const anterior = primeiroDia(somarMes(mesAtual(), -1));
     // O banco (RLS) já devolve só os dados da própria criança quando ela está logada.
-    const [perfis, saldosData, lancData, pendData, rank, fech, fechAnt] = await Promise.all([
+    const [perfis, saldosData, lancData, pendData, rank, fech, fechAnt, metasData, itensData] = await Promise.all([
       supabase.from('perfis').select('*').eq('papel', 'crianca').order('nome', { ascending: false }),
       supabase.from('saldos').select('*'),
       supabase
@@ -61,7 +65,11 @@ export default function DashboardPage() {
       supabase.rpc('ranking_mes', { p_mes: primeiroDia(mes) }),
       supabase.from('fechamentos_mensais').select('*').eq('mes_referencia', primeiroDia(mes)),
       supabase.from('fechamentos_mensais').select('id', { count: 'exact', head: true }).eq('mes_referencia', anterior),
+      supabase.from('metas').select('*').eq('ativo', true),
+      supabase.from('itens_regras').select('*'),
     ]);
+    if (metasData.data) setMetas(metasData.data);
+    if (itensData.data) setItens(itensData.data);
 
     if (perfis.data) {
       const visiveis = perfil.papel === 'crianca' ? perfis.data.filter((p) => p.id === perfil.id) : perfis.data;
@@ -94,6 +102,7 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, carregar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'saldos' }, carregar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fechamentos_mensais' }, carregar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'metas' }, carregar)
       .subscribe();
     return () => {
       supabase.removeChannel(canal);
@@ -201,6 +210,22 @@ export default function DashboardPage() {
           cor: CORES_CRIANCA[r.nome] ?? '#64748b',
         }))}
       />
+
+      {criancaAtual && !fechamentos[criancaAtual.id] && (
+        <MetasCard
+          nome={criancaAtual.nome}
+          lista={progresso(metas, lancamentos, new Map(itens.map((i) => [i.id, i])), criancaAtual.id, mes)}
+        />
+      )}
+
+      {Object.keys(fechamentos).length > 0 && (
+        <a
+          href={`/relatorio?mes=${mes}`}
+          className="block rounded-xl bg-slate-900 border border-slate-800 px-4 py-3 text-sm text-blue-300"
+        >
+          📄 Ver relatório de {nomeMes(mes)} →
+        </a>
+      )}
 
       {criancaAtual && (
         <section className="rounded-2xl bg-slate-900 p-5 shadow-lg border border-slate-800">

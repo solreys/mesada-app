@@ -71,6 +71,7 @@ export interface Fechamento {
   saldo_inicial: number;
   bonus: number;
   punicoes: number;
+  bonus_metas: number;
   saldo_final: number;
   destino: DestinoSobra;
   valor_para_poupanca: number;
@@ -80,4 +81,32 @@ export interface Fechamento {
   poupanca_depois: number;
   fechado_por: string | null;
   fechado_em: string;
+}
+
+export type TipoMeta = 'maximo' | 'minimo';
+
+export interface Meta {
+  id: string;
+  crianca_id: string | null; // null = as duas crianças
+  item_id: string | null;
+  area: string | null;
+  tipo: TipoMeta;
+  limite: number;
+  bonus: number;
+  ativo: boolean;
+  criado_por: string | null;
+  criado_em: string;
+}
+
+export interface MetaResultado {
+  id: string;
+  meta_id: string | null;
+  crianca_id: string;
+  mes_referencia: string;
+  descricao: string;
+  tipo: TipoMeta;
+  limite: number;
+  realizado: number;
+  cumprida: boolean;
+  bonus: number;
 }
