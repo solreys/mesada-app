@@ -102,3 +102,12 @@ export async function buscarTudo<T>(
   }
   return todas;
 }
+
+// Carinha do mês pela mesada atual em relação aos R$ 120 iniciais.
+export function humorDoMes(valor: number): string {
+  if (valor >= SALDO_INICIAL_MES) return '😄';
+  if (valor >= SALDO_INICIAL_MES * 0.85) return '🙂';
+  if (valor >= SALDO_INICIAL_MES * 0.65) return '😐';
+  if (valor >= SALDO_INICIAL_MES * 0.4) return '😟';
+  return '😣';
+}
