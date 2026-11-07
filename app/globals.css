@@ -5,3 +5,11 @@
 body {
   -webkit-tap-highlight-color: transparent;
 }
+
+@media print {
+  body { background: #fff !important; color: #0f172a !important; }
+  .print\:hidden { display: none !important; }
+  /* Tema escuro não sai na impressão: tudo vira texto escuro em fundo branco. */
+  * { color: #0f172a !important; background: transparent !important; border-color: #cbd5e1 !important; box-shadow: none !important; }
+  section { break-inside: avoid; }
+}

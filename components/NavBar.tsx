@@ -60,7 +60,7 @@ export default function NavBar() {
   ];
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-20 border-t border-slate-800 bg-slate-950/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+    <nav className="print:hidden fixed bottom-0 inset-x-0 z-20 border-t border-slate-800 bg-slate-950/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
       <ul className="max-w-lg mx-auto flex">
         {itens.map((i) => {
           const ativo = pathname === i.href || (i.href === '/historico' && pathname === '/analise');

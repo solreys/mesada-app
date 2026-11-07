@@ -5,6 +5,7 @@ import { supabaseBrowser } from '@/lib/supabase';
 import type { CategoriaItem, ConfigFinanceira, ItemRegra } from '@/lib/types';
 import { AREAS, lerValor, mesAtual, nomeMes } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
+import MetasConfig from '@/components/MetasConfig';
 
 // Punição sempre negativa, bônus sempre positivo.
 function normalizar(categoria: CategoriaItem, valor: number): number {
@@ -468,6 +469,8 @@ export default function ConfigPage() {
           </div>
         )}
       </section>
+
+      {editavel && perfil && <MetasConfig itens={itens} perfil={perfil} />}
 
       <section className="rounded-2xl bg-slate-900 p-4 border border-slate-800 space-y-3">
         <h3 className="text-sm uppercase tracking-wide text-slate-400">Taxa CDI mensal (%)</h3>
