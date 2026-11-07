@@ -87,9 +87,6 @@ export default function LoginPage() {
         >
           {carregando ? 'Entrando…' : 'Entrar'}
         </button>
-        <a href="/dashboard" className="block text-center text-sm text-slate-400 hover:text-slate-200">
-          Ver dashboard como criança (somente leitura) →
-        </a>
       </form>
     </main>
   );

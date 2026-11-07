@@ -2,34 +2,52 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
-import type { Perfil, Saldo, Lancamento } from '@/lib/types';
+import type { Perfil, Saldo, Lancamento, Fechamento } from '@/lib/types';
 import SaldoCard from '@/components/SaldoCard';
 import ExtratoTable from '@/components/ExtratoTable';
 import GraficoEvolucao from '@/components/GraficoEvolucao';
 import RankingCard from '@/components/RankingCard';
+import PendentesLista from '@/components/PendentesLista';
 import {
   CORES_CRIANCA,
   SALDO_INICIAL_MES,
+  formatarReal,
   intervaloMes,
   mesAtual,
   nomeMes,
+  primeiroDia,
   somarMes,
 } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
 
+interface LinhaRanking {
+  crianca_id: string;
+  nome: string;
+  movimento: number;
+}
+
 export default function DashboardPage() {
-  const { perfil } = usePerfil();
+  const { perfil } = usePerfil(true);
   const [criancas, setCriancas] = useState<Perfil[]>([]);
   const [saldos, setSaldos] = useState<Record<string, Saldo>>({});
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
-  const [pendentes, setPendentes] = useState(0);
+  const [pendentes, setPendentes] = useState<Lancamento[]>([]);
+  const [ranking, setRanking] = useState<LinhaRanking[]>([]);
+  const [fechamentos, setFechamentos] = useState<Record<string, Fechamento>>({});
+  const [anteriorFechado, setAnteriorFechado] = useState(true);
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [mes, setMes] = useState(mesAtual());
 
+  const souCrianca = perfil?.papel === 'crianca';
+  const souResponsavel = perfil?.papel === 'responsavel';
+
   const carregar = useCallback(async () => {
+    if (!perfil) return;
     const supabase = supabaseBrowser();
     const { inicio, fim } = intervaloMes(mes);
-    const [{ data: perfis }, { data: saldosData }, { data: lancData }, { count }] = await Promise.all([
+    const anterior = primeiroDia(somarMes(mesAtual(), -1));
+    // O banco (RLS) já devolve só os dados da própria criança quando ela está logada.
+    const [perfis, saldosData, lancData, pendData, rank, fech, fechAnt] = await Promise.all([
       supabase.from('perfis').select('*').eq('papel', 'crianca').order('nome', { ascending: false }),
       supabase.from('saldos').select('*'),
       supabase
@@ -39,42 +57,61 @@ export default function DashboardPage() {
         .gte('criado_em', inicio)
         .lt('criado_em', fim)
         .order('criado_em', { ascending: false }),
-      supabase.from('lancamentos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
+      supabase.from('lancamentos').select('*').eq('status', 'pendente').order('criado_em', { ascending: true }),
+      supabase.rpc('ranking_mes', { p_mes: primeiroDia(mes) }),
+      supabase.from('fechamentos_mensais').select('*').eq('mes_referencia', primeiroDia(mes)),
+      supabase.from('fechamentos_mensais').select('id', { count: 'exact', head: true }).eq('mes_referencia', anterior),
     ]);
 
-    if (perfis) {
-      setCriancas(perfis);
-      setSelecionado((atual) => atual ?? perfis[0]?.id ?? null);
+    if (perfis.data) {
+      const visiveis = perfil.papel === 'crianca' ? perfis.data.filter((p) => p.id === perfil.id) : perfis.data;
+      setCriancas(perfis.data);
+      setSelecionado((atual) => (perfil.papel === 'crianca' ? perfil.id : atual ?? visiveis[0]?.id ?? null));
     }
-    if (saldosData) {
+    if (saldosData.data) {
       const map: Record<string, Saldo> = {};
-      saldosData.forEach((s) => (map[s.crianca_id] = s));
+      saldosData.data.forEach((s) => (map[s.crianca_id] = s));
       setSaldos(map);
     }
-    if (lancData) setLancamentos(lancData);
-    setPendentes(count ?? 0);
-  }, [mes]);
+    if (lancData.data) setLancamentos(lancData.data);
+    if (pendData.data) setPendentes(pendData.data);
+    if (rank.data) setRanking(rank.data as LinhaRanking[]);
+    if (fech.data) {
+      const map: Record<string, Fechamento> = {};
+      fech.data.forEach((f) => (map[f.crianca_id] = f));
+      setFechamentos(map);
+    }
+    setAnteriorFechado((fechAnt.count ?? 0) > 0);
+  }, [mes, perfil]);
 
   useEffect(() => {
+    if (!perfil) return;
     carregar();
     const supabase = supabaseBrowser();
-    // Realtime: qualquer lançamento ou mudança de saldo atualiza o painel na hora,
-    // em qualquer dispositivo conectado.
+    // Realtime: lançamentos, saldos e fechamentos atualizam o painel na hora em todos os aparelhos.
     const canal = supabase
       .channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, carregar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'saldos' }, carregar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fechamentos_mensais' }, carregar)
       .subscribe();
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [carregar]);
+  }, [carregar, perfil]);
 
+  if (!perfil) {
+    return <main className="max-w-3xl mx-auto p-4 pt-8 text-slate-400">Carregando…</main>;
+  }
+
+  const nomes = Object.fromEntries(criancas.map((c) => [c.id, c.nome]));
+  const cartoes = souCrianca ? criancas.filter((c) => c.id === perfil.id) : criancas;
   const criancaAtual = criancas.find((c) => c.id === selecionado);
   const lancamentosCrianca = lancamentos.filter((l) => l.crianca_id === selecionado);
   const somaMes = (id: string) =>
     lancamentos.filter((l) => l.crianca_id === id).reduce((acc, l) => acc + Number(l.valor), 0);
   const ehMesAtual = mes === mesAtual();
+  const mesAnterior = somarMes(mesAtual(), -1);
 
   // Evolução diária: começa o mês em R$ 120 e acumula os lançamentos aprovados de cada dia.
   const porDia = new Map<string, number>();
@@ -93,44 +130,21 @@ export default function DashboardPage() {
 
   return (
     <main className="max-w-3xl mx-auto p-4 pb-28 space-y-5">
-      <header className="pt-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Mesada Zon &amp; Ettore</h1>
-          <p className="text-sm text-slate-400">
-            {perfil ? `Olá, ${perfil.nome}` : 'Somente leitura — entre para lançar'}
-          </p>
-        </div>
+      <header className="pt-4">
+        <h1 className="text-2xl font-bold">{souCrianca ? `Mesada do ${perfil.nome}` : 'Mesada Zon & Ettore'}</h1>
+        <p className="text-sm text-slate-400">Olá, {perfil.nome}</p>
       </header>
 
-      {pendentes > 0 && (
+      {souResponsavel && !anteriorFechado && (
         <a
-          href={perfil?.papel === 'responsavel' ? '/aprovacoes' : '/lancamento'}
-          className="block rounded-xl bg-amber-900/40 border border-amber-700 px-4 py-3 text-sm text-amber-200"
+          href="/fechamento"
+          className="block rounded-xl bg-blue-950/60 border border-blue-800 px-4 py-3 text-sm text-blue-200"
         >
-          {pendentes} lançamento(s) aguardando aprovação
-          {perfil?.papel === 'responsavel' ? ' — toque para revisar →' : ''}
+          {nomeMes(mesAnterior)} ainda não foi fechado — toque para fechar →
         </a>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        {criancas.map((c) => {
-          const s = saldos[c.id];
-          return (
-            <button
-              key={c.id}
-              onClick={() => setSelecionado(c.id)}
-              className={`text-left rounded-2xl ${selecionado === c.id ? 'ring-2 ring-blue-500' : ''}`}
-            >
-              <SaldoCard
-                nome={c.nome}
-                saldoMes={Number(s?.saldo_mes ?? 0)}
-                saldoPoupanca={Number(s?.saldo_poupanca ?? 0)}
-                corAccent={CORES_CRIANCA[c.nome] ?? '#64748b'}
-              />
-            </button>
-          );
-        })}
-      </div>
+      <PendentesLista pendentes={pendentes} nomes={nomes} perfil={perfil} onMudou={carregar} />
 
       <div className="flex items-center justify-between rounded-xl bg-slate-900 border border-slate-800 px-2 py-1">
         <button onClick={() => setMes(somarMes(mes, -1))} className="px-3 py-2 text-slate-300" aria-label="Mês anterior">
@@ -147,13 +161,44 @@ export default function DashboardPage() {
         </button>
       </div>
 
+      <div className={`grid gap-3 ${cartoes.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {cartoes.map((c) => {
+          const f = fechamentos[c.id];
+          return (
+            <button
+              key={c.id}
+              onClick={() => setSelecionado(c.id)}
+              className={`text-left rounded-2xl ${selecionado === c.id && cartoes.length > 1 ? 'ring-2 ring-blue-500' : ''}`}
+            >
+              <SaldoCard
+                nome={c.nome}
+                rotuloMes={ehMesAtual ? 'Mesada do mês' : `Resultado de ${nomeMes(mes).split(' ')[0].toLowerCase()}`}
+                saldoMes={f ? Number(f.saldo_final) : SALDO_INICIAL_MES + somaMes(c.id)}
+                rotuloPoupanca={f ? 'Poupança no fechamento' : 'Poupança hoje (rende CDI)'}
+                saldoPoupanca={Number(f ? f.poupanca_depois : saldos[c.id]?.saldo_poupanca ?? 0)}
+                rodape={
+                  f
+                    ? f.destino === 'pago'
+                      ? `Fechado · ${formatarReal(Number(f.saldo_final))} pago`
+                      : `Fechado · ${formatarReal(Number(f.valor_para_poupanca))} na poupança`
+                    : !ehMesAtual
+                      ? 'Mês ainda não fechado'
+                      : undefined
+                }
+                corAccent={CORES_CRIANCA[c.nome] ?? '#64748b'}
+              />
+            </button>
+          );
+        })}
+      </div>
+
       <RankingCard
         titulo={`Ranking — ${nomeMes(mes)}`}
-        itens={criancas.map((c) => ({
-          nome: c.nome,
-          resultado: SALDO_INICIAL_MES + somaMes(c.id),
-          movimento: somaMes(c.id),
-          cor: CORES_CRIANCA[c.nome] ?? '#64748b',
+        itens={ranking.map((r) => ({
+          nome: r.nome,
+          resultado: SALDO_INICIAL_MES + Number(r.movimento),
+          movimento: Number(r.movimento),
+          cor: CORES_CRIANCA[r.nome] ?? '#64748b',
         }))}
       />
 

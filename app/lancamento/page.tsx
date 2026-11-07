@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
-import type { Perfil, ItemRegra, Lancamento, Saldo, CategoriaItem } from '@/lib/types';
-import { CORES_CRIANCA, formatarReal, lerValor } from '@/lib/calculos';
+import type { Perfil, ItemRegra, Lancamento, CategoriaItem } from '@/lib/types';
+import { CORES_CRIANCA, SALDO_INICIAL_MES, formatarReal, intervaloMes, lerValor, mesAtual } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
 
 interface Aviso {
@@ -20,11 +20,11 @@ function inicioDoDia(): string {
 }
 
 export default function LancamentoPage() {
-  const { perfil, carregando } = usePerfil();
+  const { perfil, carregando } = usePerfil(true);
   const [criancas, setCriancas] = useState<Perfil[]>([]);
   const [itens, setItens] = useState<ItemRegra[]>([]);
-  const [saldos, setSaldos] = useState<Record<string, Saldo>>({});
-  const [hoje, setHoje] = useState<Lancamento[]>([]);
+  // Lançamentos do mês (não rejeitados); "hoje" é um recorte deste.
+  const [doMes, setDoMes] = useState<Lancamento[]>([]);
   const [criancaId, setCriancaId] = useState('');
   const [aba, setAba] = useState<CategoriaItem>('punicao');
   const [busca, setBusca] = useState('');
@@ -39,20 +39,12 @@ export default function LancamentoPage() {
 
   const carregarMovimento = useCallback(async () => {
     const supabase = supabaseBrowser();
-    const [{ data: s }, { data: l }] = await Promise.all([
-      supabase.from('saldos').select('*'),
-      supabase
-        .from('lancamentos')
-        .select('*')
-        .gte('criado_em', inicioDoDia())
-        .neq('status', 'rejeitado'),
-    ]);
-    if (s) {
-      const map: Record<string, Saldo> = {};
-      s.forEach((x) => (map[x.crianca_id] = x));
-      setSaldos(map);
-    }
-    if (l) setHoje(l);
+    const { data: l } = await supabase
+      .from('lancamentos')
+      .select('*')
+      .gte('criado_em', intervaloMes(mesAtual()).inicio)
+      .neq('status', 'rejeitado');
+    if (l) setDoMes(l);
   }, []);
 
   useEffect(() => {
@@ -73,7 +65,6 @@ export default function LancamentoPage() {
     const canal = supabase
       .channel('lancamento-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, carregarMovimento)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'saldos' }, carregarMovimento)
       .subscribe();
     return () => {
       supabase.removeChannel(canal);
@@ -169,12 +160,18 @@ export default function LancamentoPage() {
     return Number(item.valor) ? Math.round(soma / Number(item.valor)) : 0;
   }
 
+  const hoje = doMes.filter((l) => l.criado_em >= inicioDoDia());
   const termo = busca.trim().toLowerCase();
   const itensFiltrados = itens.filter(
     (i) => i.categoria === aba && (!termo || i.descricao.toLowerCase().includes(termo))
   );
   const criancaAtual = criancas.find((c) => c.id === criancaId);
-  const saldoAtual = Number(saldos[criancaId]?.saldo_mes ?? 0);
+  // Mesma conta do painel: 120 + aprovados do mês (independe da virada).
+  const saldoAtual =
+    SALDO_INICIAL_MES +
+    doMes
+      .filter((l) => l.crianca_id === criancaId && l.status === 'aprovado')
+      .reduce((acc, l) => acc + Number(l.valor), 0);
   const somaHoje = hoje
     .filter((l) => l.crianca_id === criancaId && l.status === 'aprovado')
     .reduce((acc, l) => acc + Number(l.valor), 0);
@@ -184,7 +181,8 @@ export default function LancamentoPage() {
     <main className="max-w-lg mx-auto px-4 pb-40">
       <div className="sticky top-0 z-10 -mx-4 px-4 pt-4 pb-3 bg-slate-950/95 backdrop-blur space-y-3 border-b border-slate-900">
         <div className="flex gap-2">
-          {criancas.map((c) => (
+          {/* Criança logada só vê e lança para si mesma. */}
+          {criancas.filter((c) => perfil?.papel !== 'crianca' || c.id === perfil.id).map((c) => (
             <button
               key={c.id}
               onClick={() => setCriancaId(c.id)}

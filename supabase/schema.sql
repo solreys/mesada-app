@@ -10,7 +10,7 @@ create type papel as enum ('responsavel', 'crianca');
 
 create table perfis (
   id uuid primary key default gen_random_uuid(),
-  auth_user_id uuid references auth.users(id) on delete set null, -- null para crianças (sem login próprio)
+  auth_user_id uuid references auth.users(id) on delete set null, -- login do responsável ou da criança
   nome text not null,
   papel papel not null,
   avatar_url text,
@@ -159,3 +159,5 @@ create trigger trg_aplicar_transferencia
 -- ============================================================
 -- Migração (out/2026): lançamentos de criança ficam pendentes até um responsável aprovar
 -- Ver supabase/migrations/20261005000000_status_lancamento.sql (rode depois deste arquivo).
+-- Depois: 20261102000000_realtime.sql e 20261107000000_privacidade_fechamento.sql
+-- (esta última substitui as policies de leitura aberta acima: login obrigatório, criança só vê os próprios dados).

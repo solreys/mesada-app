@@ -59,3 +59,23 @@ export interface RendimentoHistorico {
   valor_rendimento: number;
   aplicado_em: string;
 }
+
+export type DestinoSobra = 'poupanca' | 'pago' | 'debito_poupanca';
+
+export interface Fechamento {
+  id: string;
+  crianca_id: string;
+  mes_referencia: string;
+  saldo_inicial: number;
+  bonus: number;
+  punicoes: number;
+  saldo_final: number;
+  destino: DestinoSobra;
+  valor_para_poupanca: number;
+  taxa_cdi_pct: number | null;
+  poupanca_antes: number;
+  rendimento: number;
+  poupanca_depois: number;
+  fechado_por: string | null;
+  fechado_em: string;
+}

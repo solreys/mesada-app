@@ -144,7 +144,7 @@ function LinhaItem({
 }
 
 export default function ConfigPage() {
-  const { perfil } = usePerfil();
+  const { perfil } = usePerfil(true);
   const editavel = perfil?.papel === 'responsavel';
   const [itens, setItens] = useState<ItemRegra[]>([]);
   const [busca, setBusca] = useState('');
@@ -297,6 +297,13 @@ export default function ConfigPage() {
         <h1 className="text-xl font-bold">Configurações</h1>
         {!editavel && <p className="text-sm text-slate-400">Somente responsáveis podem editar.</p>}
       </header>
+
+      {editavel && (
+        <a href="/fechamento" className="block rounded-2xl bg-blue-950/60 border border-blue-800 p-4 text-sm text-blue-200">
+          <strong className="block">Fechamento do mês →</strong>
+          Congela o mês anterior, aplica o CDI na poupança e recomeça a mesada.
+        </a>
+      )}
 
       <section className="rounded-2xl bg-slate-900 p-4 border border-slate-800 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">

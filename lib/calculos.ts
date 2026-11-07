@@ -1,3 +1,6 @@
+// Primeiro mês fechado pelo app (até setembro/2026 a virada foi manual).
+export const PRIMEIRO_MES_FECHAMENTO = '2026-10';
+
 // Valor com que cada criança começa o mês em saldo_mes.
 export const SALDO_INICIAL_MES = 120;
 
@@ -52,4 +55,37 @@ export function calcularRendimento(
 ): number {
   const taxaEfetiva = (taxaCdiPct / 100) * multiplicador;
   return Number((saldoPoupanca * taxaEfetiva).toFixed(2));
+}
+
+// 'AAAA-MM' -> 'AAAA-MM-01' (formato de mes_referencia no banco).
+export function primeiroDia(mes: string): string {
+  return `${mes}-01`;
+}
+
+// 'AAAA-MM' de uma data/hora ISO, no horário local.
+export function mesDe(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Nome curto do mês: 'out/26'.
+export function mesCurto(mes: string): string {
+  const [ano, m] = mes.split('-').map(Number);
+  const nome = new Date(ano, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  return `${nome}/${String(ano).slice(2)}`;
+}
+
+// Busca todas as linhas de uma consulta, contornando o limite de 1000 linhas por resposta do Supabase.
+export async function buscarTudo<T>(
+  consulta: (de: number, ate: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  const tamanho = 1000;
+  const todas: T[] = [];
+  for (let de = 0; ; de += tamanho) {
+    const { data, error } = await consulta(de, de + tamanho - 1);
+    if (error || !data) break;
+    todas.push(...data);
+    if (data.length < tamanho) break;
+  }
+  return todas;
 }

@@ -1,13 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase';
 import type { Perfil } from '@/lib/types';
 
 // Perfil do usuário logado (null se não houver login). `carregando` fica true até a primeira resposta.
-export function usePerfil() {
+// exigirLogin: sem login, manda para /login (os dados só são liberados no banco para quem está logado).
+export function usePerfil(exigirLogin = false) {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (exigirLogin && !carregando && !perfil) router.replace('/login');
+  }, [exigirLogin, carregando, perfil, router]);
 
   useEffect(() => {
     const supabase = supabaseBrowser();
