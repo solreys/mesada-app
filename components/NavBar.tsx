@@ -10,6 +10,7 @@ const ICONES: Record<string, string> = {
   lancar: 'M12 5v14M5 12h14',
   aprovacoes: 'M5 13l4 4L19 7',
   config: 'M4 6h16M4 12h16M4 18h10',
+  historico: 'M4 19V9M10 19V5M16 19v-7M22 19H2',
   conta: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0',
 };
 
@@ -51,8 +52,9 @@ export default function NavBar() {
     { href: '/dashboard', rotulo: 'Painel', icone: 'painel' },
     { href: '/lancamento', rotulo: 'Lançar', icone: 'lancar' },
     ...(perfil?.papel === 'responsavel'
-      ? [{ href: '/aprovacoes', rotulo: 'Aprovar', icone: 'aprovacoes', badge: pendentes }]
+      ? [{ href: '/aprovacoes', rotulo: 'Auditar', icone: 'aprovacoes', badge: pendentes }]
       : []),
+    { href: '/historico', rotulo: 'Histórico', icone: 'historico' },
     { href: '/config', rotulo: 'Catálogo', icone: 'config' },
     { href: perfil ? '/conta' : '/login', rotulo: perfil ? perfil.nome : 'Entrar', icone: 'conta' },
   ];

@@ -52,6 +52,9 @@ Abra http://localhost:3000
 **Computador (Chrome/Edge):** abra a URL → ícone de instalação na barra de endereço → "Instalar".
 
 ## Uso mensal
+- **Fechamento do mês (dia 1º ou depois):** responsável → Catálogo → *Fechamento do mês* (ou o aviso azul no Painel). Informe o CDI do mês que terminou e, para cada criança, se a sobra vai para a poupança ou é paga em dinheiro. Saldo negativo é descontado da poupança. O rendimento é aplicado uma única vez, o mês fica travado e a mesada recomeça em R$ 120. Antes, resolva os itens pendentes em *Auditar*.
+- **Auditoria:** itens marcados pelas crianças aparecem no topo do Painel; ✓ aceita, ✕ retira.
+- **Histórico:** resultado de cada mês e quantas vezes cada item aconteceu, mês a mês e no geral.
 - **Lançar pontos:** responsável loga → botão "+ Lançar" → escolhe criança → escolhe regra/bônus → confirma. Saldo atualiza na hora em todos os aparelhos.
 - **Poupar:** (a implementar na Fase seguinte, se quiser) transferir do saldo do mês para a poupança, que rende automaticamente todo dia 1.
 - **Taxa CDI:** atualize em `/config` todo início de mês (não há API automática do Banco Central configurada nesta versão — ver "Próximos passos").
