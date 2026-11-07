@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
 import type { CategoriaItem, ConfigFinanceira, ItemRegra } from '@/lib/types';
-import { lerValor, mesAtual, nomeMes } from '@/lib/calculos';
+import { AREAS, lerValor, mesAtual, nomeMes } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
 
 // Punição sempre negativa, bônus sempre positivo.
@@ -56,12 +56,14 @@ function LinhaItem({
 }) {
   const [descricao, setDescricao] = useState(item.descricao);
   const [valor, setValor] = useState(valorTexto(item.valor));
+  const [icone, setIcone] = useState(item.icone ?? '');
   const [estado, setEstado] = useState<Estado>();
 
   useEffect(() => {
     setDescricao(item.descricao);
     setValor(valorTexto(item.valor));
-  }, [item.descricao, item.valor]);
+    setIcone(item.icone ?? '');
+  }, [item.descricao, item.valor, item.icone]);
 
   async function salvar(mudancas: Partial<ItemRegra>) {
     setEstado('salvando');
@@ -74,6 +76,11 @@ function LinhaItem({
     const d = descricao.trim();
     if (!d) return setDescricao(item.descricao);
     if (d !== item.descricao) salvar({ descricao: d });
+  }
+
+  function aoSairIcone() {
+    const i = icone.trim() || null;
+    if (i !== (item.icone ?? null)) salvar({ icone: i });
   }
 
   function aoSairValor() {
@@ -89,14 +96,40 @@ function LinhaItem({
   return (
     <tr className={`border-b border-slate-800 ${item.ativo ? '' : 'opacity-40'}`}>
       <td className="py-1 pr-1">
-        <input
-          value={descricao}
+        <div className="flex items-center">
+          <input
+            value={icone}
+            disabled={!editavel}
+            onChange={(e) => setIcone(e.target.value)}
+            onBlur={aoSairIcone}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            aria-label="Ícone"
+            placeholder="＋"
+            className="w-9 shrink-0 rounded bg-transparent px-1 py-1.5 text-center text-lg outline-none focus:bg-slate-800 focus:ring-1 focus:ring-blue-500"
+          />
+          <input
+            value={descricao}
+            disabled={!editavel}
+            onChange={(e) => setDescricao(e.target.value)}
+            onBlur={aoSairDescricao}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            className="w-full min-w-0 rounded bg-transparent px-2 py-1.5 text-sm outline-none focus:bg-slate-800 focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        <select
+          value={item.area ?? ''}
           disabled={!editavel}
-          onChange={(e) => setDescricao(e.target.value)}
-          onBlur={aoSairDescricao}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-          className="w-full rounded bg-transparent px-2 py-1.5 text-sm outline-none focus:bg-slate-800 focus:ring-1 focus:ring-blue-500"
-        />
+          onChange={(e) => salvar({ area: e.target.value || null })}
+          aria-label="Área"
+          className="ml-9 mt-0.5 rounded bg-slate-800/60 px-1 py-0.5 text-[11px] text-slate-400 outline-none"
+        >
+          <option value="">Sem área</option>
+          {AREAS.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
       </td>
       <td className="py-1 pr-1 w-24">
         <div className={`flex items-center rounded focus-within:bg-slate-800 focus-within:ring-1 focus-within:ring-blue-500 ${cor}`}>
@@ -189,7 +222,7 @@ export default function ConfigPage() {
   }
 
   function exportarCsv() {
-    const linhas = ['categoria;descricao;valor;ativo'];
+    const linhas = ['categoria;descricao;valor;ativo;area;icone'];
     itens.forEach((i) =>
       linhas.push(
         [
@@ -197,6 +230,8 @@ export default function ConfigPage() {
           campoCsv(i.descricao),
           valorTexto(i.valor),
           i.ativo ? 'sim' : 'não',
+          campoCsv(i.area ?? ''),
+          i.icone ?? '',
         ].join(';')
       )
     );
@@ -219,7 +254,7 @@ export default function ConfigPage() {
     const porDescricao = new Map(itens.map((i) => [i.descricao.trim().toLowerCase(), i]));
 
     linhas.slice(1).forEach((linha, n) => {
-      const [cat, descricao, valorStr, ativoStr] = dividirLinhaCsv(linha);
+      const [cat, descricao, valorStr, ativoStr, areaStr, iconeStr] = dividirLinhaCsv(linha);
       const c = (cat ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       const categoria: CategoriaItem | null = c.startsWith('pun') ? 'punicao' : c.startsWith('bon') ? 'bonus' : null;
       const v = lerValor(valorStr ?? '');
@@ -230,15 +265,29 @@ export default function ConfigPage() {
       const a = (ativoStr ?? 'sim').toLowerCase();
       const ativo = !['nao', 'não', 'n', 'false', '0'].includes(a);
       const valor = normalizar(categoria, v);
+      // Colunas área/ícone são opcionais: se a planilha não tiver, mantém o que está no app.
+      const area = areaStr === undefined ? undefined : areaStr || null;
+      const icone = iconeStr === undefined ? undefined : iconeStr || null;
       const existente = porDescricao.get(descricao.toLowerCase());
       if (!existente) {
-        novos.push({ categoria, descricao, valor, ativo });
+        novos.push({ categoria, descricao, valor, ativo, area: area ?? null, icone: icone ?? null });
       } else if (
         existente.categoria !== categoria ||
         Number(existente.valor) !== valor ||
-        existente.ativo !== ativo
+        existente.ativo !== ativo ||
+        (area !== undefined && area !== existente.area) ||
+        (icone !== undefined && icone !== existente.icone)
       ) {
-        alterados.push({ id: existente.id, mudancas: { categoria, valor, ativo } });
+        alterados.push({
+          id: existente.id,
+          mudancas: {
+            categoria,
+            valor,
+            ativo,
+            ...(area !== undefined ? { area } : {}),
+            ...(icone !== undefined ? { icone } : {}),
+          },
+        });
       }
     });
 
@@ -368,7 +417,7 @@ export default function ConfigPage() {
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-[11px] text-slate-500 border-b border-slate-800">
-                    <th className="py-1 pl-2 font-normal">Descrição</th>
+                    <th className="py-1 pl-2 font-normal">Ícone · descrição · área</th>
                     <th className="py-1 font-normal text-right pr-2">R$</th>
                     <th className="py-1 font-normal">Tipo</th>
                     <th className="py-1 font-normal text-center">Ativo</th>
@@ -410,7 +459,7 @@ export default function ConfigPage() {
                 onChange={(e) => setNovo({ ...novo, descricao: e.target.value })}
                 onKeyDown={(e) => e.key === 'Enter' && adicionarItem()}
                 placeholder="Descrição"
-                className="flex-1 rounded-lg bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 min-w-0 rounded-lg bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button onClick={adicionarItem} className="rounded-lg bg-blue-600 px-4 text-sm font-semibold">
                 Adicionar

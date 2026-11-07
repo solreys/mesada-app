@@ -11,6 +11,7 @@ import {
   diasSemPunicao,
   noIntervalo,
   padroes,
+  porArea,
   projecaoMes,
   tendencias,
   totais,
@@ -101,6 +102,24 @@ export default function AnalisePage() {
   const melhorando = tend.filter((t) => t.melhora > 0).sort((a, b) => b.melhora - a.melhora).slice(0, 5);
   const piorando = tend.filter((t) => t.melhora < 0).sort((a, b) => a.melhora - b.melhora).slice(0, 5);
 
+  const areas = porArea(atual, anterior);
+  const maxArea = Math.max(1, ...areas.map((a) => Math.max(a.punicoes, a.bonus)));
+
+  // Zon × Ettore (só para responsáveis, com "Os dois" selecionado).
+  const comparar = !souCrianca && quem === 'todos' && visiveis.length === 2;
+  const porCrianca = visiveis.map((c) => ({
+    c,
+    mapa: contarPorItem(noIntervalo(lancs.filter((l) => l.crianca_id === c.id), inicio, fim), itens),
+  }));
+  const linhasComparacao = comparar
+    ? Array.from(atual.values())
+        .filter((c) => c.qtd > 0)
+        .sort((a, b) => b.qtd - a.qtd)
+        .slice(0, 10)
+        .map((c) => ({ c, valores: porCrianca.map((p) => Math.max(0, p.mapa.get(c.chave)?.qtd ?? 0)) }))
+    : [];
+  const maxComparacao = Math.max(1, ...linhasComparacao.flatMap((l) => l.valores));
+
   const livres = diasSemPunicao(noIntervalo(meus, inicio, fim), itens, inicio, fim);
   const pad = padroes(noIntervalo(meus, inicio, fim), itens);
   const maxSemana = Math.max(...pad.semana);
@@ -126,6 +145,9 @@ export default function AnalisePage() {
     sugestoes.push(
       `“${p.nome}” é a punição mais frequente: ${p.qtd}× em ${janela} dias (${share}% das punições, ${formatarReal(p.valor)}). Bom ponto para uma conversa ou um combinado específico.`
     );
+  }
+  if (areas[0]?.punicoes >= 3) {
+    sugestoes.push(`A área com mais punições é ${areas[0].area} (${areas[0].punicoes}×, ${formatarReal(areas[0].punicoesValor)}).`);
   }
   piorando
     .filter((t) => t.negativo && t.agora - t.antes >= 2)
@@ -246,7 +268,10 @@ export default function AnalisePage() {
             {g.lista.map((c) => (
               <div key={c.chave} className="space-y-1">
                 <div className="flex justify-between gap-3 text-sm">
-                  <span className="leading-snug">{c.nome}</span>
+                  <span className="leading-snug">
+                    {c.icone && <span className="mr-1">{c.icone}</span>}
+                    {c.nome}
+                  </span>
                   <span className="whitespace-nowrap font-semibold">
                     {c.qtd}× <span className="text-xs font-normal text-slate-400">{formatarReal(c.valor)}</span>
                   </span>
@@ -257,6 +282,69 @@ export default function AnalisePage() {
           </div>
         ))}
       </section>
+
+      {/* Por área */}
+      {areas.length > 0 && (
+        <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
+          <h3 className="text-sm uppercase tracking-wide text-slate-400">Por área ({janela} dias)</h3>
+          {areas.map((a) => (
+            <div key={a.area} className="space-y-1">
+              <div className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="font-medium">{a.area}</span>
+                <span className="text-xs text-slate-400 whitespace-nowrap">
+                  <span className="text-red-400">{a.punicoes}×</span> · <span className="text-emerald-400">{a.bonus}×</span>
+                  {a.punicoesAntes !== a.punicoes && (
+                    <span className={`ml-1 ${a.punicoes < a.punicoesAntes ? 'text-emerald-400' : 'text-red-400'}`}>
+                      ({a.punicoes < a.punicoesAntes ? '▼' : '▲'} punições, antes {a.punicoesAntes})
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex gap-1">
+                <div className="flex-1 flex justify-end">
+                  <div className="h-2 rounded-l bg-red-400/80" style={{ width: `${(a.punicoes / maxArea) * 100}%` }} />
+                </div>
+                <div className="flex-1">
+                  <div className="h-2 rounded-r bg-emerald-400/80" style={{ width: `${(a.bonus / maxArea) * 100}%` }} />
+                </div>
+              </div>
+            </div>
+          ))}
+          <p className="text-[11px] text-slate-500">
+            Vermelho = punições, verde = bônus. A área de cada item é definida em Catálogo.
+          </p>
+        </section>
+      )}
+
+      {/* Zon × Ettore */}
+      {comparar && linhasComparacao.length > 0 && (
+        <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm uppercase tracking-wide text-slate-400">
+              {porCrianca.map((p) => p.c.nome).join(' × ')} ({janela} dias)
+            </h3>
+            <span className="text-[11px] text-slate-500">só pais</span>
+          </div>
+          {linhasComparacao.map(({ c, valores }) => (
+            <div key={c.chave} className="space-y-1">
+              <p className="text-sm leading-snug">
+                <span className={`mr-1 ${c.negativo ? 'text-red-400' : 'text-emerald-400'}`}>{c.negativo ? '−' : '+'}</span>
+                {c.icone && <span className="mr-1">{c.icone}</span>}
+                {c.nome}
+              </p>
+              {porCrianca.map((p, i) => (
+                <div key={p.c.id} className="flex items-center gap-2 text-xs">
+                  <span className="w-12 text-slate-400">{p.c.nome}</span>
+                  <div className="flex-1">
+                    <Barra valor={valores[i]} max={maxComparacao} cor={CORES_CRIANCA[p.c.nome] ?? '#64748b'} />
+                  </div>
+                  <span className="w-6 text-right">{valores[i]}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Tendência */}
       <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4">

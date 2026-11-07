@@ -25,6 +25,8 @@ export default function LancamentoPage() {
   const [itens, setItens] = useState<ItemRegra[]>([]);
   // Lançamentos do mês (não rejeitados); "hoje" é um recorte deste.
   const [doMes, setDoMes] = useState<Lancamento[]>([]);
+  // Uso de cada item nos últimos 60 dias, para montar os favoritos.
+  const [uso60, setUso60] = useState<Pick<Lancamento, 'crianca_id' | 'item_id'>[]>([]);
   const [criancaId, setCriancaId] = useState('');
   const [aba, setAba] = useState<CategoriaItem>('punicao');
   const [busca, setBusca] = useState('');
@@ -45,6 +47,15 @@ export default function LancamentoPage() {
       .gte('criado_em', intervaloMes(mesAtual()).inicio)
       .neq('status', 'rejeitado');
     if (l) setDoMes(l);
+    const { data: u } = await supabase
+      .from('lancamentos')
+      .select('crianca_id, item_id')
+      .not('item_id', 'is', null)
+      .neq('status', 'rejeitado')
+      .not('descricao', 'like', 'Estorno:%')
+      .gte('criado_em', new Date(Date.now() - 60 * 86_400_000).toISOString())
+      .limit(5000);
+    if (u) setUso60(u);
   }, []);
 
   useEffect(() => {
@@ -165,6 +176,15 @@ export default function LancamentoPage() {
   const itensFiltrados = itens.filter(
     (i) => i.categoria === aba && (!termo || i.descricao.toLowerCase().includes(termo))
   );
+  // Favoritos: os 6 itens mais usados pela criança nesta aba (últimos 60 dias).
+  const usoPorItem = new Map<string, number>();
+  uso60
+    .filter((l) => l.crianca_id === criancaId && l.item_id)
+    .forEach((l) => usoPorItem.set(l.item_id!, (usoPorItem.get(l.item_id!) ?? 0) + 1));
+  const favoritos = itens
+    .filter((i) => i.categoria === aba && usoPorItem.has(i.id))
+    .sort((a, b) => usoPorItem.get(b.id)! - usoPorItem.get(a.id)!)
+    .slice(0, 6);
   const criancaAtual = criancas.find((c) => c.id === criancaId);
   // Mesma conta do painel: 120 + aprovados do mês (independe da virada).
   const saldoAtual =
@@ -255,6 +275,37 @@ export default function LancamentoPage() {
         Um toque já lança. Errou? Toque em “Desfazer” no aviso que aparece embaixo.
       </p>
 
+      {!termo && favoritos.length > 0 && (
+        <section className="mb-4">
+          <p className="mb-2 text-xs uppercase tracking-wide text-slate-400">Mais usados</p>
+          <div className="grid grid-cols-3 gap-2">
+            {favoritos.map((item) => {
+              const vezes = vezesHoje(item);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => tocar(item)}
+                  disabled={!podeLancar}
+                  className={`relative flex flex-col items-center gap-1 rounded-xl px-2 py-3 text-center transition active:scale-95 disabled:opacity-50 ${
+                    piscando === item.id ? (item.valor < 0 ? 'bg-red-900/70' : 'bg-emerald-900/70') : 'bg-slate-900 hover:bg-slate-800'
+                  }`}
+                >
+                  {vezes > 0 && (
+                    <span className="absolute right-1 top-1 rounded-full bg-slate-700 px-1.5 text-[10px]">×{vezes}</span>
+                  )}
+                  <span className="text-2xl leading-none">{item.icone ?? (item.valor < 0 ? '⚠️' : '⭐')}</span>
+                  <span className="line-clamp-2 text-[11px] leading-tight text-slate-200">{item.descricao}</span>
+                  <span className={`text-xs font-semibold ${item.valor < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {formatarReal(Number(item.valor))}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 mb-2 text-xs uppercase tracking-wide text-slate-400">Todos</p>
+        </section>
+      )}
+
       <div className="space-y-2">
         {itensFiltrados.map((item) => {
           const vezes = vezesHoje(item);
@@ -271,6 +322,7 @@ export default function LancamentoPage() {
                   : 'bg-slate-900 hover:bg-slate-800'
               }`}
             >
+              <span className="w-7 text-center text-xl leading-none">{item.icone ?? ''}</span>
               <span className="flex-1 text-sm leading-snug">{item.descricao}</span>
               {vezes > 0 && (
                 <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-200 whitespace-nowrap">
