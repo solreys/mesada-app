@@ -1,3 +1,16 @@
+// Áreas de comportamento usadas para agrupar os itens do catálogo.
+export const AREAS = [
+  'Autocontrole',
+  'Casa',
+  'Escola e atividades',
+  'Hábitos',
+  'Honestidade',
+  'Irmão e família',
+  'Respeito',
+  'Responsabilidade',
+];
+export const SEM_AREA = 'Outros';
+
 // Primeiro mês fechado pelo app (até setembro/2026 a virada foi manual).
 export const PRIMEIRO_MES_FECHAMENTO = '2026-10';
 

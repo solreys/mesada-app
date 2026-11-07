@@ -17,6 +17,8 @@ export interface ItemRegra {
   descricao: string;
   valor: number;
   ativo: boolean;
+  icone: string | null;
+  area: string | null;
   criado_em: string;
 }
 

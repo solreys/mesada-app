@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { supabaseBrowser } from '@/lib/supabase';
-import type { Fechamento, ItemRegra, Lancamento, Perfil } from '@/lib/types';
+import type { Fechamento, ItemRegra, Lancamento, Perfil, RendimentoHistorico, Saldo } from '@/lib/types';
 import {
   CORES_CRIANCA,
   SALDO_INICIAL_MES,
@@ -43,6 +43,8 @@ export default function HistoricoPage() {
   const [lancs, setLancs] = useState<Lanc[]>([]);
   const [itens, setItens] = useState<ItemRegra[]>([]);
   const [fechamentos, setFechamentos] = useState<Fechamento[]>([]);
+  const [saldos, setSaldos] = useState<Saldo[]>([]);
+  const [rendimentos, setRendimentos] = useState<RendimentoHistorico[]>([]);
   const [quem, setQuem] = useState<string>('todos');
   const [periodo, setPeriodo] = useState<Periodo>(6);
   const [filtro, setFiltro] = useState<Filtro>('todos');
@@ -53,10 +55,12 @@ export default function HistoricoPage() {
     if (!perfil) return;
     const supabase = supabaseBrowser();
     (async () => {
-      const [p, i, f, l] = await Promise.all([
+      const [p, i, f, s, r, l] = await Promise.all([
         supabase.from('perfis').select('*').eq('papel', 'crianca').order('nome', { ascending: false }),
         supabase.from('itens_regras').select('*'),
         supabase.from('fechamentos_mensais').select('*'),
+        supabase.from('saldos').select('*'),
+        supabase.from('rendimentos_historico').select('*'),
         buscarTudo<Lanc>((de, ate) =>
           supabase
             .from('lancamentos')
@@ -69,6 +73,8 @@ export default function HistoricoPage() {
       setCriancas(p.data ?? []);
       setItens(i.data ?? []);
       setFechamentos(f.data ?? []);
+      setSaldos(s.data ?? []);
+      setRendimentos(r.data ?? []);
       setLancs(l);
       if (perfil.papel === 'crianca') setQuem(perfil.id);
       setCarregado(true);
@@ -121,11 +127,37 @@ export default function HistoricoPage() {
     };
   });
 
+  // ---------- Poupança ----------
+  // Pontos: início de cada mês com rendimento aplicado (base + rendimento) e o fechamento (sobrescreve), mais hoje.
+  const pontosPoupanca = new Map<string, Record<string, number | string>>();
+  const ponto = (data: string) => {
+    if (!pontosPoupanca.has(data)) pontosPoupanca.set(data, { data: data === 'hoje' ? 'hoje' : mesCurto(data) });
+    return pontosPoupanca.get(data)!;
+  };
+  selecionadas.forEach((c) => {
+    rendimentos
+      .filter((r) => r.crianca_id === c.id)
+      .forEach((r) => (ponto(r.mes_referencia.slice(0, 7))[c.nome] = Number(r.saldo_base) + Number(r.valor_rendimento)));
+    fechamentos
+      .filter((f) => f.crianca_id === c.id)
+      .forEach((f) => (ponto(somarMes(f.mes_referencia.slice(0, 7), 1))[c.nome] = Number(f.poupanca_depois)));
+  });
+  const serieAnterior = Array.from(pontosPoupanca.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => v);
+  const hojePoupanca: Record<string, number | string> = { data: 'hoje' };
+  selecionadas.forEach((c) => (hojePoupanca[c.nome] = Number(saldos.find((s) => s.crianca_id === c.id)?.saldo_poupanca ?? 0)));
+  const seriePoupanca = [...serieAnterior, hojePoupanca];
+  const poupancaHoje = selecionadas.reduce((a, c) => a + Number(hojePoupanca[c.nome] ?? 0), 0);
+  const rendimentoTotal = rendimentos
+    .filter((r) => ids.has(r.crianca_id))
+    .reduce((a, r) => a + Number(r.valor_rendimento), 0);
+
   // ---------- Por item ----------
   const nomeItem = new Map(itens.map((i) => [i.id, i]));
   const grupos = new Map<
     string,
-    { nome: string; negativo: boolean; porMes: Map<string, { qtd: number; valor: number }>; qtd: number; valor: number }
+    { nome: string; icone: string | null; negativo: boolean; porMes: Map<string, { qtd: number; valor: number }>; qtd: number; valor: number }
   >();
   doFiltro.forEach((l) => {
     const estorno = l.descricao.startsWith(PREFIXO_ESTORNO);
@@ -134,7 +166,7 @@ export default function HistoricoPage() {
     const item = l.item_id ? nomeItem.get(l.item_id) : undefined;
     if (!grupos.has(chave)) {
       const valorBase = item ? Number(item.valor) : estorno ? -Number(l.valor) : Number(l.valor);
-      grupos.set(chave, { nome: item?.descricao ?? desc, negativo: valorBase < 0, porMes: new Map(), qtd: 0, valor: 0 });
+      grupos.set(chave, { nome: item?.descricao ?? desc, icone: item?.icone ?? null, negativo: valorBase < 0, porMes: new Map(), qtd: 0, valor: 0 });
     }
     const g = grupos.get(chave)!;
     const qtd = estorno ? -1 : 1;
@@ -238,6 +270,40 @@ export default function HistoricoPage() {
       </section>
 
       <section className="rounded-2xl bg-slate-900 p-5 border border-slate-800 space-y-3">
+        <h3 className="text-sm uppercase tracking-wide text-slate-400">Poupança</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs text-slate-400">Hoje</p>
+            <p className="text-2xl font-bold text-emerald-400">{formatarReal(poupancaHoje)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">Rendimento do CDI até hoje</p>
+            <p className="text-2xl font-bold text-emerald-300">+{formatarReal(rendimentoTotal)}</p>
+          </div>
+        </div>
+        {seriePoupanca.length > 1 && (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={seriePoupanca} margin={{ left: -10, right: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+              <XAxis dataKey="data" stroke="#64748b" fontSize={12} />
+              <YAxis stroke="#64748b" fontSize={12} domain={['auto', 'auto']} />
+              <Tooltip
+                contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8 }}
+                formatter={(v: number, nome: string) => [formatarReal(v), nome]}
+              />
+              {selecionadas.length > 1 && <Legend />}
+              {selecionadas.map((c) => (
+                <Line key={c.id} type="linear" dataKey={c.nome} stroke={CORES_CRIANCA[c.nome] ?? '#10b981'} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+        <p className="text-[11px] text-slate-500">
+          Pontos: início de cada mês (já com o rendimento) e hoje. Inclui sobras guardadas e descontos de saldo negativo.
+        </p>
+      </section>
+
+      <section className="rounded-2xl bg-slate-900 p-5 border border-slate-800 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm uppercase tracking-wide text-slate-400">Por item</h3>
           <button onClick={() => setVerValor(!verValor)} className="rounded-lg bg-slate-800 px-3 py-1 text-xs font-medium">
@@ -280,6 +346,7 @@ export default function HistoricoPage() {
                   <tr key={g.chave} className="border-b border-slate-800/60">
                     <td className="sticky left-0 bg-slate-900 py-1.5 px-2 leading-snug">
                       <span className={`mr-1 ${g.negativo ? 'text-red-400' : 'text-emerald-400'}`}>{g.negativo ? '−' : '+'}</span>
+                      {g.icone && <span className="mr-1">{g.icone}</span>}
                       {g.nome}
                     </td>
                     <td className="py-1.5 px-1">

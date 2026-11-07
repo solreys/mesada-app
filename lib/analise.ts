@@ -1,5 +1,6 @@
 // Cálculos puros da tela de Análise (sem acesso ao banco).
 import type { ItemRegra, Lancamento } from '@/lib/types';
+import { SEM_AREA } from '@/lib/calculos';
 
 export type Lanc = Pick<Lancamento, 'crianca_id' | 'item_id' | 'descricao' | 'valor' | 'criado_em'>;
 
@@ -10,6 +11,8 @@ export interface Contagem {
   chave: string;
   nome: string;
   negativo: boolean; // punição
+  area: string;
+  icone: string | null;
   qtd: number; // estornos descontam 1
   valor: number;
 }
@@ -25,7 +28,15 @@ export function contarPorItem(lancs: Lanc[], itens: Map<string, ItemRegra>): Map
     let c = mapa.get(chave);
     if (!c) {
       const base = item ? Number(item.valor) : estorno ? -Number(l.valor) : Number(l.valor);
-      c = { chave, nome: item?.descricao ?? desc, negativo: base < 0, qtd: 0, valor: 0 };
+      c = {
+        chave,
+        nome: item?.descricao ?? desc,
+        negativo: base < 0,
+        area: item?.area ?? SEM_AREA,
+        icone: item?.icone ?? null,
+        qtd: 0,
+        valor: 0,
+      };
       mapa.set(chave, c);
     }
     c.qtd += estorno ? -1 : 1;
@@ -147,4 +158,38 @@ export function padroes(lancs: Lanc[], itens: Map<string, ItemRegra>) {
     else turno['Noite']++;
   });
   return { semana, turno };
+}
+
+export interface PorArea {
+  area: string;
+  punicoes: number;
+  punicoesValor: number;
+  bonus: number;
+  bonusValor: number;
+  punicoesAntes: number;
+}
+
+// Totais por área de comportamento no período atual, com as punições do período anterior para comparar.
+export function porArea(atual: Map<string, Contagem>, anterior: Map<string, Contagem>): PorArea[] {
+  const mapa = new Map<string, PorArea>();
+  const pegar = (area: string) => {
+    if (!mapa.has(area)) mapa.set(area, { area, punicoes: 0, punicoesValor: 0, bonus: 0, bonusValor: 0, punicoesAntes: 0 });
+    return mapa.get(area)!;
+  };
+  atual.forEach((c) => {
+    const a = pegar(c.area);
+    if (c.negativo) {
+      a.punicoes += c.qtd;
+      a.punicoesValor += c.valor;
+    } else {
+      a.bonus += c.qtd;
+      a.bonusValor += c.valor;
+    }
+  });
+  anterior.forEach((c) => {
+    if (c.negativo) pegar(c.area).punicoesAntes += c.qtd;
+  });
+  return Array.from(mapa.values())
+    .filter((a) => a.punicoes || a.bonus || a.punicoesAntes)
+    .sort((x, y) => y.punicoes - x.punicoes || y.bonus - x.bonus);
 }
