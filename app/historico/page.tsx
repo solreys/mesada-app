@@ -5,8 +5,8 @@ import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContai
 import { supabaseBrowser } from '@/lib/supabase';
 import type { Fechamento, ItemRegra, Lancamento, Perfil, RendimentoHistorico, Saldo } from '@/lib/types';
 import {
-  CORES_CRIANCA,
-  SALDO_INICIAL_MES,
+  corCrianca,
+  valorMesada,
   buscarTudo,
   formatarReal,
   mesAtual,
@@ -106,7 +106,7 @@ export default function HistoricoPage() {
       const soma = doFiltro
         .filter((l) => l.crianca_id === c.id && mesDe(l.criado_em) === m)
         .reduce((a, l) => a + Number(l.valor), 0);
-      linha[c.nome] = Number((SALDO_INICIAL_MES + soma).toFixed(2));
+      linha[c.nome] = Number((valorMesada() + soma).toFixed(2));
     });
     return linha;
   });
@@ -120,7 +120,7 @@ export default function HistoricoPage() {
       mes: m,
       bonus,
       punicoes,
-      resultado: SALDO_INICIAL_MES * selecionadas.length + bonus + punicoes,
+      resultado: valorMesada() * selecionadas.length + bonus + punicoes,
       poupanca: fech.length === selecionadas.length && fech.length > 0
         ? fech.reduce((a, f) => a + Number(f.poupanca_depois), 0)
         : null,
@@ -227,18 +227,18 @@ export default function HistoricoPage() {
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
             <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
             <YAxis stroke="#64748b" fontSize={12} domain={['auto', 'auto']} />
-            <ReferenceLine y={SALDO_INICIAL_MES} stroke="#475569" strokeDasharray="4 4" />
+            <ReferenceLine y={valorMesada()} stroke="#475569" strokeDasharray="4 4" />
             <Tooltip
               contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8 }}
               formatter={(v: number, nome: string) => [formatarReal(v), nome]}
             />
             {selecionadas.length > 1 && <Legend />}
             {selecionadas.map((c) => (
-              <Line key={c.id} type="linear" dataKey={c.nome} stroke={CORES_CRIANCA[c.nome] ?? '#2563eb'} strokeWidth={2} dot={{ r: 3 }} />
+              <Line key={c.id} type="linear" dataKey={c.nome} stroke={corCrianca(c.nome)} strokeWidth={2} dot={{ r: 3 }} />
             ))}
           </LineChart>
         </ResponsiveContainer>
-        <p className="mt-1 text-xs text-slate-500">Linha tracejada = {formatarReal(SALDO_INICIAL_MES)} (ponto de partida).</p>
+        <p className="mt-1 text-xs text-slate-500">Linha tracejada = {formatarReal(valorMesada())} (ponto de partida).</p>
 
         <div className="overflow-x-auto mt-3">
           <table className="w-full text-sm">
@@ -293,7 +293,7 @@ export default function HistoricoPage() {
               />
               {selecionadas.length > 1 && <Legend />}
               {selecionadas.map((c) => (
-                <Line key={c.id} type="linear" dataKey={c.nome} stroke={CORES_CRIANCA[c.nome] ?? '#10b981'} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                <Line key={c.id} type="linear" dataKey={c.nome} stroke={corCrianca(c.nome)} strokeWidth={2} dot={{ r: 3 }} connectNulls />
               ))}
             </LineChart>
           </ResponsiveContainer>

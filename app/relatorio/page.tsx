@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
 import type { Fechamento, ItemRegra, Lancamento, Meta, MetaResultado, Perfil } from '@/lib/types';
 import {
-  CORES_CRIANCA,
-  SALDO_INICIAL_MES,
+  corCrianca,
+  valorMesada,
   formatarReal,
   intervaloMes,
   mesAtual,
@@ -99,7 +99,7 @@ export default function RelatorioPage() {
           bonus: p.ok ? Number(p.meta.bonus) : 0,
         }));
     const bonusMetas = f ? Number(f.bonus_metas ?? 0) : metasLista.reduce((a, m) => a + m.bonus, 0);
-    const final = f ? Number(f.saldo_final) : SALDO_INICIAL_MES + bonus + punicoes + bonusMetas;
+    const final = f ? Number(f.saldo_final) : valorMesada() + bonus + punicoes + bonusMetas;
     return { c, f, bonus, punicoes, bonusMetas, final, topPun, topBon, melhoras, pioras, livres, metasLista };
   });
 
@@ -108,7 +108,7 @@ export default function RelatorioPage() {
       .map((r) => {
         const linhas = [
           `📄 ${nomeMes(mes)} — ${r.c.nome}`,
-          `Resultado: ${formatarReal(r.final)} (${formatarReal(SALDO_INICIAL_MES)} + bônus ${formatarReal(r.bonus)} + punições ${formatarReal(r.punicoes)}${r.bonusMetas ? ` + metas ${formatarReal(r.bonusMetas)}` : ''})`,
+          `Resultado: ${formatarReal(r.final)} (${formatarReal(valorMesada())} + bônus ${formatarReal(r.bonus)} + punições ${formatarReal(r.punicoes)}${r.bonusMetas ? ` + metas ${formatarReal(r.bonusMetas)}` : ''})`,
           `Dias sem punição: ${r.livres.livres} de ${r.livres.total}`,
         ];
         if (r.topPun.length) linhas.push(`Mais punições: ${r.topPun.map((x) => `${x.nome} (${x.qtd}×)`).join(', ')}`);
@@ -166,7 +166,7 @@ export default function RelatorioPage() {
         <section key={r.c.id} className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: CORES_CRIANCA[r.c.nome] ?? '#64748b' }} />
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: corCrianca(r.c.nome) }} />
               {r.c.nome}
             </h2>
             <span className={`text-2xl font-bold ${r.final < 0 ? 'text-red-400' : 'text-slate-50'}`}>{formatarReal(r.final)}</span>
@@ -174,7 +174,7 @@ export default function RelatorioPage() {
 
           <table className="w-full text-sm">
             <tbody className="divide-y divide-slate-800">
-              <tr><td className="py-1 text-slate-400">Mesada base</td><td className="py-1 text-right">{formatarReal(SALDO_INICIAL_MES)}</td></tr>
+              <tr><td className="py-1 text-slate-400">Mesada base</td><td className="py-1 text-right">{formatarReal(valorMesada())}</td></tr>
               <tr><td className="py-1 text-slate-400">Bônus</td><td className="py-1 text-right text-emerald-400">{formatarReal(r.bonus)}</td></tr>
               <tr><td className="py-1 text-slate-400">Punições</td><td className="py-1 text-right text-red-400">{formatarReal(r.punicoes)}</td></tr>
               {r.metasLista.length > 0 && (

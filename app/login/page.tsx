@@ -1,32 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase';
 
-const EMAIL_CRIANCA = {
-  zon: 'zon.reys@clq.g12.br',
-  ettore: 'ettore.reys@clq.g12.br',
-} as const;
-
 export default function LoginPage() {
   const [modo, setModo] = useState<'crianca' | 'responsavel'>('crianca');
-  const [crianca, setCrianca] = useState<'zon' | 'ettore'>('zon');
+  // Nomes das crianças vêm do banco da família (nomes_login); o e-mail é buscado só na hora de entrar.
+  const [nomes, setNomes] = useState<string[] | null>(null);
+  const [crianca, setCrianca] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    supabaseBrowser()
+      .rpc('nomes_login')
+      .then(({ data, error }) => {
+        const lista = error ? [] : ((data ?? []) as { nome: string }[]).map((x) => x.nome);
+        setNomes(lista);
+        setCrianca(lista[0] ?? '');
+      });
+  }, []);
+
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
     setCarregando(true);
     setErro(null);
     const supabase = supabaseBrowser();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: modo === 'crianca' ? EMAIL_CRIANCA[crianca] : email,
-      password: senha,
-    });
+    let login = email;
+    if (modo === 'crianca' && nomes && nomes.length > 0) {
+      const { data } = await supabase.rpc('email_login', { p_nome: crianca });
+      login = (data as string | null) ?? '';
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email: login, password: senha });
     setCarregando(false);
     if (error) {
       setErro(modo === 'crianca' ? 'Senha incorreta.' : 'E-mail ou senha inválidos.');
@@ -48,14 +57,14 @@ export default function LoginPage() {
             Sou responsável
           </button>
         </div>
-        {modo === 'crianca' ? (
-          <div className="flex gap-2">
-            {(['zon', 'ettore'] as const).map((n) => (
+        {modo === 'crianca' && nomes && nomes.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {nomes.map((n) => (
               <button
                 key={n}
                 type="button"
                 onClick={() => setCrianca(n)}
-                className={`flex-1 rounded-lg py-3 font-semibold capitalize ${crianca === n ? 'bg-blue-600' : 'bg-slate-800'}`}
+                className={`flex-1 rounded-lg py-3 font-semibold ${crianca === n ? 'bg-blue-600 text-white' : 'bg-slate-800'}`}
               >
                 {n}
               </button>

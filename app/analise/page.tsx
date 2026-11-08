@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
 import type { ItemRegra, Perfil } from '@/lib/types';
-import { CORES_CRIANCA, SALDO_INICIAL_MES, buscarTudo, formatarReal, intervaloMes, mesAtual } from '@/lib/calculos';
+import { corCrianca, valorMesada, buscarTudo, formatarReal, intervaloMes, mesAtual } from '@/lib/calculos';
 import {
   DIAS_SEMANA,
   type Lanc,
@@ -110,8 +110,8 @@ export default function AnalisePage() {
   const areas = porArea(atual, anterior);
   const maxArea = Math.max(1, ...areas.map((a) => Math.max(a.punicoes, a.bonus)));
 
-  // Zon × Ettore (só para responsáveis, com "Os dois" selecionado).
-  const comparar = !souCrianca && quem === 'todos' && visiveis.length === 2;
+  // Comparação entre irmãos (só para responsáveis, com "Todos" selecionado).
+  const comparar = !souCrianca && quem === 'todos' && visiveis.length >= 2;
   const porCrianca = visiveis.map((c) => ({
     c,
     mapa: contarPorItem(noIntervalo(lancs.filter((l) => l.crianca_id === c.id), inicio, fim), itens),
@@ -135,7 +135,7 @@ export default function AnalisePage() {
     const soma = lancs
       .filter((l) => l.crianca_id === c.id && l.criado_em >= inicioMes)
       .reduce((a, l) => a + Number(l.valor), 0);
-    return { c, ...projecaoMes(soma, hoje, SALDO_INICIAL_MES) };
+    return { c, ...projecaoMes(soma, hoje, valorMesada()) };
   });
 
   // Itens ativos sem nenhum uso nos últimos 60 dias (só para responsáveis).
@@ -171,7 +171,7 @@ export default function AnalisePage() {
     else if (razao >= 2) sugestoes.push(`Há ${razao.toFixed(1).replace('.', ',')} punições para cada bônus no período. Registrar também os acertos equilibra o quadro.`);
   }
   projecoes
-    .filter((p) => p.projetado < SALDO_INICIAL_MES / 2)
+    .filter((p) => p.projetado < valorMesada() / 2)
     .forEach((p) =>
       sugestoes.push(
         `No ritmo atual, ${p.c.nome} termina o mês em ${formatarReal(p.projetado)}${p.projetado < 0 ? ' (negativo: desconta da poupança no fechamento)' : ''}.`
@@ -324,7 +324,7 @@ export default function AnalisePage() {
         </section>
       )}
 
-      {/* Zon × Ettore */}
+      {/* Comparação entre irmãos */}
       {comparar && linhasComparacao.length > 0 && (
         <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3">
           <div className="flex items-center justify-between">
@@ -344,7 +344,7 @@ export default function AnalisePage() {
                 <div key={p.c.id} className="flex items-center gap-2 text-xs">
                   <span className="w-12 text-slate-400">{p.c.nome}</span>
                   <div className="flex-1">
-                    <Barra valor={valores[i]} max={maxComparacao} cor={CORES_CRIANCA[p.c.nome] ?? '#64748b'} />
+                    <Barra valor={valores[i]} max={maxComparacao} cor={corCrianca(p.c.nome)} />
                   </div>
                   <span className="w-6 text-right">{valores[i]}</span>
                 </div>
@@ -423,12 +423,12 @@ export default function AnalisePage() {
         {projecoes.map((p) => (
           <div key={p.c.id} className="flex items-center justify-between gap-3 text-sm">
             <span className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CORES_CRIANCA[p.c.nome] ?? '#64748b' }} />
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: corCrianca(p.c.nome) }} />
               {p.c.nome}
             </span>
             <span className="text-right">
               hoje {formatarReal(p.atual)} →{' '}
-              <strong className={p.projetado < 0 ? 'text-red-400' : p.projetado < SALDO_INICIAL_MES ? 'text-amber-300' : 'text-emerald-400'}>
+              <strong className={p.projetado < 0 ? 'text-red-400' : p.projetado < valorMesada() ? 'text-amber-300' : 'text-emerald-400'}>
                 {formatarReal(p.projetado)}
               </strong>
             </span>

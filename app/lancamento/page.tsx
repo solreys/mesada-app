@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
 import type { Perfil, ItemRegra, Lancamento, CategoriaItem } from '@/lib/types';
-import { CORES_CRIANCA, SALDO_INICIAL_MES, formatarReal, intervaloMes, lerValor, mesAtual } from '@/lib/calculos';
+import { corCrianca, valorMesada, formatarReal, intervaloMes, lerValor, mesAtual } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
 import { bancoTemOcorrido, inserirLancamento } from '@/lib/compat';
 
@@ -216,9 +216,9 @@ export default function LancamentoPage() {
     .sort((a, b) => usoPorItem.get(b.id)! - usoPorItem.get(a.id)!)
     .slice(0, 6);
   const criancaAtual = criancas.find((c) => c.id === criancaId);
-  // Mesma conta do painel: 120 + aprovados do mês (independe da virada).
+  // Mesma conta do painel: valor da mesada + aprovados do mês (independe da virada).
   const saldoAtual =
-    SALDO_INICIAL_MES +
+    valorMesada() +
     doMes
       .filter((l) => l.crianca_id === criancaId && l.status === 'aprovado')
       .reduce((acc, l) => acc + Number(l.valor), 0);
@@ -239,7 +239,7 @@ export default function LancamentoPage() {
               className={`flex-1 rounded-xl py-3 font-semibold transition ${
                 criancaId === c.id ? 'text-white shadow-lg' : 'bg-slate-800 text-slate-300'
               }`}
-              style={criancaId === c.id ? { backgroundColor: CORES_CRIANCA[c.nome] ?? '#2563eb' } : undefined}
+              style={criancaId === c.id ? { backgroundColor: corCrianca(c.nome) } : undefined}
             >
               {c.nome}
             </button>

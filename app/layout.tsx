@@ -1,9 +1,10 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import NavBar from '@/components/NavBar';
+import FamiliaProvider from '@/components/FamiliaProvider';
 
 export const metadata: Metadata = {
-  title: 'Mesada Zon & Ettore',
+  title: 'Mesada',
   description: 'App dinâmico de mesada com regras, benefícios e punições',
   manifest: '/manifest.json',
 };
@@ -22,8 +23,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <body className="bg-slate-950 text-slate-100 min-h-screen">
-        {children}
-        <NavBar />
+        <FamiliaProvider>
+          {children}
+          <NavBar />
+        </FamiliaProvider>
       </body>
     </html>
   );

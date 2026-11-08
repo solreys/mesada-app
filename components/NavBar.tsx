@@ -46,7 +46,7 @@ export default function NavBar() {
     };
   }, []);
 
-  if (pathname === '/login') return null;
+  if (pathname === '/login' || pathname === '/primeiro-acesso') return null;
 
   const itens = [
     { href: '/dashboard', rotulo: 'Painel', icone: 'painel' },

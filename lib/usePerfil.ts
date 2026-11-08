@@ -10,11 +10,14 @@ import type { Perfil } from '@/lib/types';
 export function usePerfil(exigirLogin = false) {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [logado, setLogado] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    if (exigirLogin && !carregando && !perfil) router.replace('/login');
-  }, [exigirLogin, carregando, perfil, router]);
+    if (!exigirLogin || carregando || perfil) return;
+    // Logado sem perfil: família nova (configurar) ou usuário ainda não vinculado.
+    router.replace(logado ? '/primeiro-acesso' : '/login');
+  }, [exigirLogin, carregando, perfil, logado, router]);
 
   useEffect(() => {
     const supabase = supabaseBrowser();
@@ -32,6 +35,7 @@ export function usePerfil(exigirLogin = false) {
         meu = data ?? null;
       }
       if (ativo) {
+        setLogado(!!u.user);
         setPerfil(meu);
         setCarregando(false);
       }

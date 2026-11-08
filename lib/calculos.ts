@@ -11,13 +11,9 @@ export const AREAS = [
 ];
 export const SEM_AREA = 'Outros';
 
-// Primeiro mês fechado pelo app (até setembro/2026 a virada foi manual).
-export const PRIMEIRO_MES_FECHAMENTO = '2026-10';
-
-// Valor com que cada criança começa o mês em saldo_mes.
-export const SALDO_INICIAL_MES = 120;
-
-export const CORES_CRIANCA: Record<string, string> = { Zon: '#2563eb', Ettore: '#16a34a' };
+// Valor da mesada, % do CDI e cores vêm do banco de cada família (lib/familia.ts).
+export { valorMesada, corCrianca, pctCdi, primeiroMesFechamento, nomeApp } from '@/lib/familia';
+import { valorMesada } from '@/lib/familia';
 
 // Início do mês e do mês seguinte (horário local, em ISO), para filtrar por criado_em.
 export function intervaloMes(mes: string): { inicio: string; fim: string } {
@@ -103,11 +99,12 @@ export async function buscarTudo<T>(
   return todas;
 }
 
-// Carinha do mês pela mesada atual em relação aos R$ 120 iniciais.
+// Carinha do mês pela mesada atual em relação ao valor inicial do mês.
 export function humorDoMes(valor: number): string {
-  if (valor >= SALDO_INICIAL_MES) return '😄';
-  if (valor >= SALDO_INICIAL_MES * 0.85) return '🙂';
-  if (valor >= SALDO_INICIAL_MES * 0.65) return '😐';
-  if (valor >= SALDO_INICIAL_MES * 0.4) return '😟';
+  const base = valorMesada();
+  if (valor >= base) return '😄';
+  if (valor >= base * 0.85) return '🙂';
+  if (valor >= base * 0.65) return '😐';
+  if (valor >= base * 0.4) return '😟';
   return '😣';
 }

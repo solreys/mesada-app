@@ -12,15 +12,17 @@ import MetasCard from '@/components/MetasCard';
 import ObjetivoCard from '@/components/ObjetivoCard';
 import CalendarioMes from '@/components/CalendarioMes';
 import { progresso } from '@/lib/metas';
+import { VERSAO_BANCO_APP, primeiroMesFechamento, versaoBanco } from '@/lib/familia';
 import {
-  CORES_CRIANCA,
-  SALDO_INICIAL_MES,
+  corCrianca,
+  valorMesada,
   formatarReal,
   intervaloMes,
   mesAtual,
   nomeMes,
   primeiroDia,
   somarMes,
+  nomeApp,
 } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
 
@@ -144,14 +146,14 @@ export default function DashboardPage() {
   };
   const mesAnterior = somarMes(mesAtual(), -1);
 
-  // Evolução diária: começa o mês em R$ 120 e acumula os lançamentos aprovados de cada dia.
+  // Evolução diária: começa o mês no valor da mesada e acumula os lançamentos aprovados de cada dia.
   const porDia = new Map<string, number>();
   [...lancamentosCrianca].reverse().forEach((l) => {
     const dia = new Date(l.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     porDia.set(dia, (porDia.get(dia) ?? 0) + Number(l.valor));
   });
   const [ano, m] = mes.split('-');
-  const pontosGrafico = [{ data: `01/${m}`, saldo: SALDO_INICIAL_MES }];
+  const pontosGrafico = [{ data: `01/${m}`, saldo: valorMesada() }];
   porDia.forEach((valor, dia) => {
     const ultimo = pontosGrafico[pontosGrafico.length - 1];
     const saldo = Number((ultimo.saldo + valor).toFixed(2));
@@ -162,7 +164,7 @@ export default function DashboardPage() {
   return (
     <main className="max-w-3xl mx-auto p-4 pb-28 space-y-5">
       <header className="pt-4">
-        <h1 className="text-2xl font-bold">{souCrianca ? `Mesada do ${perfil.nome}` : 'Mesada Zon & Ettore'}</h1>
+        <h1 className="text-2xl font-bold">{souCrianca ? `Mesada de ${perfil.nome}` : nomeApp()}</h1>
         <p className="text-sm text-slate-400">
           Olá, {perfil.nome} ·{' '}
           <a href="/ajuda" className="underline">
@@ -171,7 +173,14 @@ export default function DashboardPage() {
         </p>
       </header>
 
-      {souResponsavel && !anteriorFechado && (
+      {souResponsavel && versaoBanco() < VERSAO_BANCO_APP && (
+        <a href="/config#familia" className="block rounded-xl bg-amber-950/50 border border-amber-800 px-4 py-3 text-sm text-amber-200">
+          Banco de dados desatualizado (versão {versaoBanco()}, app espera {VERSAO_BANCO_APP}). Algumas funções podem falhar
+          até rodar a atualização →
+        </a>
+      )}
+
+      {souResponsavel && !anteriorFechado && (!primeiroMesFechamento() || mesAnterior >= primeiroMesFechamento()) && (
         <a
           href="/fechamento"
           className="block rounded-xl bg-blue-950/60 border border-blue-800 px-4 py-3 text-sm text-blue-200"
@@ -209,7 +218,7 @@ export default function DashboardPage() {
               <SaldoCard
                 nome={c.nome}
                 rotuloMes={ehMesAtual ? 'Mesada do mês' : `Resultado de ${nomeMes(mes).split(' ')[0].toLowerCase()}`}
-                saldoMes={f ? Number(f.saldo_final) : SALDO_INICIAL_MES + somaMes(c.id)}
+                saldoMes={f ? Number(f.saldo_final) : valorMesada() + somaMes(c.id)}
                 rotuloPoupanca={f ? 'Poupança no fechamento' : 'Poupança hoje (rende CDI)'}
                 saldoPoupanca={Number(f ? f.poupanca_depois : saldos[c.id]?.saldo_poupanca ?? 0)}
                 rodape={
@@ -221,7 +230,7 @@ export default function DashboardPage() {
                       ? 'Mês ainda não fechado'
                       : undefined
                 }
-                corAccent={CORES_CRIANCA[c.nome] ?? '#64748b'}
+                corAccent={corCrianca(c.nome)}
                 mostrarBarra={ehMesAtual && !f}
               />
             </button>
@@ -233,9 +242,9 @@ export default function DashboardPage() {
         titulo={`Ranking — ${nomeMes(mes)}`}
         itens={ranking.map((r) => ({
           nome: r.nome,
-          resultado: SALDO_INICIAL_MES + Number(r.movimento),
+          resultado: valorMesada() + Number(r.movimento),
           movimento: Number(r.movimento),
-          cor: CORES_CRIANCA[r.nome] ?? '#64748b',
+          cor: corCrianca(r.nome),
         }))}
       />
 
@@ -278,11 +287,11 @@ export default function DashboardPage() {
           </h3>
           <GraficoEvolucao
             pontos={pontosGrafico}
-            cor={CORES_CRIANCA[criancaAtual.nome] ?? '#2563eb'}
-            referencia={SALDO_INICIAL_MES}
+            cor={corCrianca(criancaAtual.nome)}
+            referencia={valorMesada()}
           />
           <p className="mt-1 text-xs text-slate-500">
-            Começa em R$ {SALDO_INICIAL_MES},00 no dia 1º/{m}/{ano}. Não inclui poupança.
+            Começa em {formatarReal(valorMesada())} no dia 1º/{m}/{ano}. Não inclui poupança.
           </p>
         </section>
       )}

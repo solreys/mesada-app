@@ -1,3 +1,4 @@
+-- LEGADO: catálogo da família original. NÃO rode em famílias novas (elas criam o próprio catálogo no app).
 -- ============================================================
 -- Seed: catálogo real (extraído de Zon_e_Ettore_mesada_crescimento_mensalidade.xlsx)
 -- Ajuste livremente aqui e rode novamente para atualizar valores.

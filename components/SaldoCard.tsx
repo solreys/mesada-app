@@ -1,6 +1,6 @@
 'use client';
 
-import { SALDO_INICIAL_MES, formatarReal, humorDoMes } from '@/lib/calculos';
+import { valorMesada, formatarReal, humorDoMes } from '@/lib/calculos';
 
 interface Props {
   nome: string;
@@ -10,7 +10,7 @@ interface Props {
   saldoPoupanca: number;
   rodape?: string;
   corAccent: string;
-  mostrarBarra?: boolean; // barra "quanto sobrou dos R$ 120" e carinha do mês
+  mostrarBarra?: boolean; // barra "quanto sobrou da mesada" e carinha do mês
 }
 
 export default function SaldoCard({
@@ -23,7 +23,7 @@ export default function SaldoCard({
   corAccent,
   mostrarBarra,
 }: Props) {
-  const pct = Math.max(0, Math.min(100, (saldoMes / SALDO_INICIAL_MES) * 100));
+  const pct = Math.max(0, Math.min(100, (saldoMes / valorMesada()) * 100));
   const corBarra = pct >= 85 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-500';
   return (
     <div className="rounded-2xl bg-slate-900 p-4 sm:p-5 shadow-lg border border-slate-800">
@@ -45,9 +45,9 @@ export default function SaldoCard({
               <div className={`h-2 rounded ${corBarra}`} style={{ width: `${pct}%` }} />
             </div>
             <p className="mt-1 text-[11px] text-slate-500">
-              {saldoMes >= SALDO_INICIAL_MES
-                ? `${formatarReal(saldoMes - SALDO_INICIAL_MES)} acima dos ${formatarReal(SALDO_INICIAL_MES)}`
-                : `perdeu ${formatarReal(SALDO_INICIAL_MES - saldoMes)} dos ${formatarReal(SALDO_INICIAL_MES)}`}
+              {saldoMes >= valorMesada()
+                ? `${formatarReal(saldoMes - valorMesada())} acima dos ${formatarReal(valorMesada())}`
+                : `perdeu ${formatarReal(valorMesada() - saldoMes)} dos ${formatarReal(valorMesada())}`}
             </p>
           </div>
         )}

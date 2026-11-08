@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
 import type { CategoriaItem, ConfigFinanceira, ItemRegra } from '@/lib/types';
-import { AREAS, lerValor, mesAtual, nomeMes } from '@/lib/calculos';
+import { AREAS, lerValor, mesAtual, nomeMes, pctCdi } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
 import MetasConfig from '@/components/MetasConfig';
+import FamiliaConfig from '@/components/FamiliaConfig';
 
 // Punição sempre negativa, bônus sempre positivo.
 function normalizar(categoria: CategoriaItem, valor: number): number {
@@ -358,6 +359,11 @@ export default function ConfigPage() {
       <section className="rounded-2xl bg-slate-900 p-4 border border-slate-800 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm uppercase tracking-wide text-slate-400">Catálogo ({itens.length} itens)</h3>
+          {itens.length === 0 && editavel && (
+            <p className="w-full text-xs text-amber-300">
+              Catálogo vazio: crie as punições e os bônus da sua família em “Nova linha” abaixo, ou importe uma planilha.
+            </p>
+          )}
           <div className="flex gap-2">
             <button onClick={exportarCsv} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium">
               Baixar planilha
@@ -470,12 +476,14 @@ export default function ConfigPage() {
         )}
       </section>
 
+      {editavel && <FamiliaConfig />}
+
       {editavel && perfil && <MetasConfig itens={itens} perfil={perfil} />}
 
       <section className="rounded-2xl bg-slate-900 p-4 border border-slate-800 space-y-3">
         <h3 className="text-sm uppercase tracking-wide text-slate-400">Taxa CDI mensal (%)</h3>
         <p className="text-xs text-slate-500">
-          No mês de aplicação, informe o CDI fechado do mês anterior (ex.: em outubro, o CDI de setembro). 100% do CDI.
+          No mês de aplicação, informe o CDI fechado do mês anterior (ex.: em outubro, o CDI de setembro). A poupança rende {pctCdi()}% do CDI (muda em Família).
         </p>
         {editavel && (
           <div className="flex gap-2">

@@ -5,8 +5,9 @@ import { supabaseBrowser } from '@/lib/supabase';
 import type { Fechamento, ItemRegra, Lancamento, Meta, Perfil, Saldo } from '@/lib/types';
 import { progresso } from '@/lib/metas';
 import {
-  PRIMEIRO_MES_FECHAMENTO,
-  SALDO_INICIAL_MES,
+  pctCdi,
+  primeiroMesFechamento,
+  valorMesada,
   formatarReal,
   intervaloMes,
   lerValor,
@@ -82,10 +83,10 @@ export default function FechamentoPage() {
     const punicoes = aprovados.filter((l) => l.valor < 0).reduce((a, l) => a + Number(l.valor), 0);
     const metasCrianca = progresso(metas, lancs, new Map(itens.map((i) => [i.id, i])), c.id, mes);
     const bonusMetas = metasCrianca.filter((m) => m.ok).reduce((a, m) => a + Number(m.meta.bonus), 0);
-    const final = SALDO_INICIAL_MES + bonus + punicoes + bonusMetas;
+    const final = valorMesada() + bonus + punicoes + bonusMetas;
     const poupanca = Number(saldos[c.id]?.saldo_poupanca ?? 0);
     const rendimento =
-      !rendimentoJaAplicado && taxaOk && poupanca > 0 ? Number((poupanca * (taxa / 100)).toFixed(2)) : 0;
+      !rendimentoJaAplicado && taxaOk && poupanca > 0 ? Number((poupanca * (taxa / 100) * (pctCdi() / 100)).toFixed(2)) : 0;
     const destino: Destino | 'debito_poupanca' = final < 0 ? 'debito_poupanca' : destinos[c.id] ?? 'poupanca';
     const para = destino === 'pago' ? 0 : final;
     return { c, bonus, punicoes, metasCrianca, bonusMetas, final, poupanca, rendimento, destino, depois: poupanca + rendimento + para };
@@ -109,14 +110,14 @@ export default function FechamentoPage() {
     carregar();
   }
 
-  const opcoesMes = [1, 2, 3].map((n) => somarMes(mesAtual(), -n)).filter((m) => m >= PRIMEIRO_MES_FECHAMENTO);
+  const opcoesMes = [1, 2, 3].map((n) => somarMes(mesAtual(), -n)).filter((m) => m >= primeiroMesFechamento());
 
   return (
     <main className="max-w-lg mx-auto p-4 pb-28 space-y-5">
       <header className="pt-4">
         <h1 className="text-xl font-bold">Fechamento do mês</h1>
         <p className="text-sm text-slate-400">
-          Congela o mês, aplica o CDI na poupança uma única vez e recomeça a mesada em {formatarReal(SALDO_INICIAL_MES)}.
+          Congela o mês, aplica o CDI na poupança uma única vez e recomeça a mesada em {formatarReal(valorMesada())}.
         </p>
       </header>
 
@@ -179,7 +180,7 @@ export default function FechamentoPage() {
                       <span className={p.final < 0 ? 'text-red-400' : ''}>{formatarReal(p.final)}</span>
                     </div>
                     <p className="text-xs text-slate-400">
-                      {formatarReal(SALDO_INICIAL_MES)} · bônus {formatarReal(p.bonus)} · punições {formatarReal(p.punicoes)}
+                      {formatarReal(valorMesada())} · bônus {formatarReal(p.bonus)} · punições {formatarReal(p.punicoes)}
                       {p.metasCrianca.length > 0 && ` · metas ${formatarReal(p.bonusMetas)}`}
                     </p>
                     {p.metasCrianca.length > 0 && (

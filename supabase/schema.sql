@@ -1,5 +1,5 @@
 -- ============================================================
--- Schema: App de Mesada Dinâmica (Zon & Ettore)
+-- Schema: App de Mesada Dinâmica
 -- Postgres / Supabase
 -- ============================================================
 

@@ -1,66 +1,31 @@
-# App de Mesada — Zon & Ettore
+# Mesada — app de mesada com regras, bônus e poupança
 
-PWA dinâmica: regras, punições, bônus, saldo em tempo real, poupança com rendimento mensal (100% CDI), sincronizada entre todos os dispositivos.
+PWA para famílias: cada filho começa o mês com um valor de mesada, os responsáveis lançam bônus e punições do catálogo da própria família, e a sobra pode ir para uma poupança que rende uma % do CDI. Tem auditoria do que as crianças marcam, fechamento mensal, metas, objetivo de poupança, histórico e análises.
+
+**Modelo de uso: uma cópia por família.** Cada família tem o próprio app (Vercel) e o próprio banco (Supabase). O código é o mesmo para todas; nenhum nome, valor, catálogo ou e-mail fica no código.
 
 ## Stack
-- Next.js 14 + Tailwind
-- Supabase (Postgres + Auth + Realtime) — free tier
-- Deploy: Vercel — free tier
-- PWA: next-pwa (instalável em celular e computador)
+- Next.js 14 (App Router) + Tailwind + TypeScript
+- Supabase (Postgres, Auth, Realtime, RLS)
+- Vercel (deploy) · PWA instalável no celular
 
----
+## Documentos
+| Arquivo | Para quê |
+|---|---|
+| [`docs/NOVA-FAMILIA.md`](docs/NOVA-FAMILIA.md) | Passo a passo para montar o app de uma família nova (~30 min) |
+| [`docs/ATUALIZAR.md`](docs/ATUALIZAR.md) | Como publicar melhorias para todas as famílias |
+| `supabase/instalar.sql` | Banco completo para família nova (gerado por `scripts/gerar-instalar.sh`) |
+| `supabase/migrations/` | Mudanças de banco, em ordem; cada uma roda em todas as famílias |
+| `supabase/legado/` | Arquivos da primeira família; **não** usar em famílias novas |
 
-## Passo 1 — Criar o projeto Supabase
-
-1. Crie conta em https://supabase.com (grátis).
-2. **New project** → dê um nome (ex: `mesada-familia`) → escolha região `South America (São Paulo)` → defina uma senha de banco.
-3. Aguarde o provisionamento (~2 min).
-4. Vá em **SQL Editor** → cole o conteúdo de `supabase/schema.sql` → **Run**.
-5. Ainda no SQL Editor, cole `supabase/rendimento_mensal.sql` → **Run**.
-6. Abra `supabase/seed.sql`, ajuste a taxa CDI (`0.90` é só exemplo — pegue a taxa real do mês) → cole e rode no SQL Editor.
-7. Em **Database → Extensions**, ative `pg_cron` (para o rendimento rodar sozinho todo mês). Depois volte ao SQL Editor e rode o bloco comentado `cron.schedule(...)` do fim de `rendimento_mensal.sql` (descomente as 3 linhas antes de rodar).
-8. Em **Authentication → Users**, crie um usuário para cada responsável (e-mail + senha).
-9. No SQL Editor, vincule cada login ao perfil de responsável:
-   ```sql
-   insert into perfis (auth_user_id, nome, papel)
-   values ('UID-DO-USUARIO-AQUI', 'Nome do Responsável', 'responsavel');
-   ```
-   (o UID aparece na lista de Authentication → Users, ao clicar no usuário)
-10. Em **Project Settings → API**, copie `Project URL` e `anon public key`.
-
-## Passo 2 — Rodar localmente (opcional, para testar antes do deploy)
-
+## Rodar localmente
 ```bash
-cp .env.example .env.local
-# cole a URL e a anon key copiadas no passo 1.10
+cp .env.example .env.local   # URL e chave pública do Supabase da família de teste
 npm install
 npm run dev
 ```
-Abra http://localhost:3000
 
-## Passo 3 — Deploy no Vercel
-
-1. Suba esta pasta para um repositório no GitHub (crie um repo vazio e faça `git push`).
-2. Em https://vercel.com → **Add New → Project** → importe o repositório.
-3. Em **Environment Variables**, adicione `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` (os mesmos do `.env.local`).
-4. **Deploy**. Em ~1 min você tem uma URL pública (ex: `mesada-familia.vercel.app`).
-
-## Passo 4 — Instalar como app (PWA)
-
-**Celular (Android/Chrome):** abra a URL → menu (⋮) → "Adicionar à tela inicial".
-**iPhone (Safari):** abra a URL → ícone de compartilhar → "Adicionar à Tela de Início".
-**Computador (Chrome/Edge):** abra a URL → ícone de instalação na barra de endereço → "Instalar".
-
-## Uso mensal
-- **Fechamento do mês (dia 1º ou depois):** responsável → Catálogo → *Fechamento do mês* (ou o aviso azul no Painel). Informe o CDI do mês que terminou e, para cada criança, se a sobra vai para a poupança ou é paga em dinheiro. Saldo negativo é descontado da poupança. O rendimento é aplicado uma única vez, o mês fica travado e a mesada recomeça em R$ 120. Antes, resolva os itens pendentes em *Auditar*.
-- **Auditoria:** itens marcados pelas crianças aparecem no topo do Painel; ✓ aceita, ✕ retira.
-- **Histórico:** resultado de cada mês e quantas vezes cada item aconteceu, mês a mês e no geral.
-- **Lançar pontos:** responsável loga → botão "+ Lançar" → escolhe criança → escolhe regra/bônus → confirma. Saldo atualiza na hora em todos os aparelhos.
-- **Poupar:** (a implementar na Fase seguinte, se quiser) transferir do saldo do mês para a poupança, que rende automaticamente todo dia 1.
-- **Taxa CDI:** atualize em `/config` todo início de mês (não há API automática do Banco Central configurada nesta versão — ver "Próximos passos").
-
-## Próximos passos sugeridos
-- Botão de "guardar na poupança" na tela do dashboard (tabela `transferencias_poupanca` já existe no schema, falta a UI).
-- Busca automática da taxa CDI via API do Banco Central (série SGS 4391) — elimina a atualização manual.
-- Tela de login simplificada para as crianças verem o próprio saldo (hoje o dashboard é aberto, sem exigir login).
-- Notificação push quando um lançamento é feito.
+## Regras principais
+- Leitura e escrita protegidas por RLS: só quem tem login vê algo; criança vê só os próprios dados; só responsável aprova, fecha mês, edita catálogo, metas e família.
+- Valor da mesada, % do CDI e primeiro mês fechável ficam em `familia_config` (editável em Catálogo → Família).
+- Fechamento (`fechar_mes`): aplica o CDI uma vez, soma bônus de metas, destino da sobra (poupança ou dinheiro), saldo negativo desconta da poupança, trava o mês.

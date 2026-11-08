@@ -26,7 +26,7 @@ create table if not exists metas_resultados (
   meta_id uuid references metas(id) on delete set null,
   crianca_id uuid not null references perfis(id) on delete cascade,
   mes_referencia date not null,
-  descricao text not null,   -- snapshot: "Gritar (forte) ≤ 2×"
+  descricao text not null,   -- snapshot, ex.: "Item X ≤ 2×"
   tipo text not null,
   limite int not null,
   realizado int not null,

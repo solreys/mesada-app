@@ -1,6 +1,6 @@
 'use client';
 
-import { SALDO_INICIAL_MES, formatarReal } from '@/lib/calculos';
+import { valorMesada, formatarReal, nomeApp, pctCdi } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
 
 function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
@@ -16,13 +16,13 @@ function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode
 export default function AjudaPage() {
   const { perfil } = usePerfil(true);
   const souCrianca = perfil?.papel === 'crianca';
-  const base = formatarReal(SALDO_INICIAL_MES);
+  const base = formatarReal(valorMesada());
 
   return (
     <main className="max-w-2xl mx-auto p-4 pb-28 space-y-4">
       <header className="pt-4">
         <h1 className="text-xl font-bold">Como funciona</h1>
-        <p className="text-sm text-slate-400">Mesada Zon &amp; Ettore</p>
+        <p className="text-sm text-slate-400">{nomeApp()}</p>
       </header>
 
       <Bloco titulo="💰 A mesada">
@@ -30,7 +30,7 @@ export default function AjudaPage() {
           Todo mês começa em <strong>{base}</strong>. Bônus somam, punições descontam. O valor do mês aparece no Painel, com a
           carinha 😄🙂😐😟😣 e a barra de quanto sobrou.
         </p>
-        <p>A poupança é separada: rende 100% do CDI uma vez por mês, no fechamento.</p>
+        <p>A poupança é separada: rende {pctCdi()}% do CDI uma vez por mês, no fechamento.</p>
       </Bloco>
 
       {souCrianca ? (
