@@ -34,6 +34,7 @@ export interface Lancamento {
   aprovado_por: string | null;
   aprovado_em: string | null;
   criado_em: string;
+  ocorrido_em?: string | null; // quando aconteceu (análises); o dinheiro conta por criado_em
 }
 
 export interface Saldo {

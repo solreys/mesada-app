@@ -23,7 +23,7 @@ export default function CalendarioMes({ mes, lancamentos, selecionado, onSelecio
 
   const porDia = new Map<number, { pun: number; bon: number; soma: number }>();
   lancamentos.forEach((l) => {
-    const d = new Date(l.criado_em);
+    const d = new Date(l.ocorrido_em ?? l.criado_em);
     if (d.getFullYear() !== ano || d.getMonth() + 1 !== m) return;
     const dia = d.getDate();
     const x = porDia.get(dia) ?? { pun: 0, bon: 0, soma: 0 };

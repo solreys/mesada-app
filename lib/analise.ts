@@ -2,7 +2,12 @@
 import type { ItemRegra, Lancamento } from '@/lib/types';
 import { SEM_AREA } from '@/lib/calculos';
 
-export type Lanc = Pick<Lancamento, 'crianca_id' | 'item_id' | 'descricao' | 'valor' | 'criado_em'>;
+export type Lanc = Pick<Lancamento, 'crianca_id' | 'item_id' | 'descricao' | 'valor' | 'criado_em' | 'ocorrido_em'>;
+
+// Quando aconteceu (se informado) ou quando foi registrado.
+export function quandoAconteceu(l: Pick<Lancamento, 'criado_em' | 'ocorrido_em'>): string {
+  return l.ocorrido_em ?? l.criado_em;
+}
 
 export const PREFIXO_ESTORNO = 'Estorno: ';
 const DIA = 86_400_000;
@@ -47,7 +52,7 @@ export function contarPorItem(lancs: Lanc[], itens: Map<string, ItemRegra>): Map
 
 export function noIntervalo(lancs: Lanc[], inicio: number, fim: number): Lanc[] {
   return lancs.filter((l) => {
-    const t = new Date(l.criado_em).getTime();
+    const t = new Date(quandoAconteceu(l)).getTime();
     return t >= inicio && t < fim;
   });
 }
@@ -118,7 +123,7 @@ export function diasSemPunicao(lancs: Lanc[], itens: Map<string, ItemRegra>, ini
   lancs.forEach((l) => {
     const item = l.item_id ? itens.get(l.item_id) : undefined;
     const negativo = item ? Number(item.valor) < 0 : Number(l.valor) < 0;
-    if (negativo && !l.descricao.startsWith(PREFIXO_ESTORNO)) comPunicao.add(diaLocal(l.criado_em));
+    if (negativo && !l.descricao.startsWith(PREFIXO_ESTORNO)) comPunicao.add(diaLocal(quandoAconteceu(l)));
   });
   let total = 0;
   let livres = 0;
@@ -150,7 +155,7 @@ export function padroes(lancs: Lanc[], itens: Map<string, ItemRegra>) {
     const item = l.item_id ? itens.get(l.item_id) : undefined;
     const negativo = item ? Number(item.valor) < 0 : Number(l.valor) < 0;
     if (!negativo) return;
-    const d = new Date(l.criado_em);
+    const d = new Date(quandoAconteceu(l));
     semana[d.getDay()]++;
     const h = d.getHours();
     if (h >= 5 && h < 12) turno['Manhã']++;
@@ -192,4 +197,55 @@ export function porArea(atual: Map<string, Contagem>, anterior: Map<string, Cont
   return Array.from(mapa.values())
     .filter((a) => a.punicoes || a.bonus || a.punicoesAntes)
     .sort((x, y) => y.punicoes - x.punicoes || y.bonus - x.bonus);
+}
+
+export interface Par {
+  a: string;
+  b: string;
+  iconeA: string | null;
+  iconeB: string | null;
+  juntos: number; // dias em que os dois aconteceram (mesma criança, mesmo dia)
+  diasA: number;
+  diasB: number;
+}
+
+// Punições que andam juntas: pares de itens que aparecem no mesmo dia para a mesma criança.
+export function punicoesJuntas(lancs: Lanc[], itens: Map<string, ItemRegra>, minimo = 2): Par[] {
+  const dias = new Map<string, Set<string>>(); // "crianca|dia" -> itens punidos
+  lancs.forEach((l) => {
+    if (l.descricao.startsWith(PREFIXO_ESTORNO) || !l.item_id) return;
+    const item = itens.get(l.item_id);
+    if (!item || Number(item.valor) >= 0) return;
+    const k = `${l.crianca_id}|${diaLocal(quandoAconteceu(l))}`;
+    if (!dias.has(k)) dias.set(k, new Set());
+    dias.get(k)!.add(item.id);
+  });
+  const diasPorItem = new Map<string, number>();
+  const pares = new Map<string, number>();
+  dias.forEach((set) => {
+    const ids = Array.from(set).sort();
+    ids.forEach((id) => diasPorItem.set(id, (diasPorItem.get(id) ?? 0) + 1));
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++) {
+        const k = `${ids[i]}|${ids[j]}`;
+        pares.set(k, (pares.get(k) ?? 0) + 1);
+      }
+  });
+  return Array.from(pares.entries())
+    .filter(([, n]) => n >= minimo)
+    .map(([k, n]) => {
+      const [a, b] = k.split('|');
+      const ia = itens.get(a)!;
+      const ib = itens.get(b)!;
+      return {
+        a: ia.descricao,
+        b: ib.descricao,
+        iconeA: ia.icone,
+        iconeB: ib.icone,
+        juntos: n,
+        diasA: diasPorItem.get(a) ?? 0,
+        diasB: diasPorItem.get(b) ?? 0,
+      };
+    })
+    .sort((x, y) => y.juntos - x.juntos);
 }

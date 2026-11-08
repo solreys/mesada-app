@@ -5,12 +5,32 @@ import { supabaseBrowser } from '@/lib/supabase';
 import type { Perfil, ItemRegra, Lancamento, CategoriaItem } from '@/lib/types';
 import { CORES_CRIANCA, SALDO_INICIAL_MES, formatarReal, intervaloMes, lerValor, mesAtual } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
+import { bancoTemOcorrido, inserirLancamento } from '@/lib/compat';
 
 interface Aviso {
   id: number;
   texto: string;
   erro?: boolean;
   desfazer?: () => Promise<void>;
+}
+
+// Quando o comportamento aconteceu (só para as análises; o saldo conta pela hora do registro).
+type Quando = 'agora' | '1h' | '3h' | 'ontem';
+const QUANDO: { id: Quando; rotulo: string }[] = [
+  { id: 'agora', rotulo: 'Agora' },
+  { id: '1h', rotulo: 'Há 1h' },
+  { id: '3h', rotulo: 'Há 3h' },
+  { id: 'ontem', rotulo: 'Ontem 20h' },
+];
+function ocorridoEm(q: Quando): string {
+  const d = new Date();
+  if (q === '1h') d.setHours(d.getHours() - 1);
+  if (q === '3h') d.setHours(d.getHours() - 3);
+  if (q === 'ontem') {
+    d.setDate(d.getDate() - 1);
+    d.setHours(20, 0, 0, 0);
+  }
+  return d.toISOString();
 }
 
 function inicioDoDia(): string {
@@ -35,6 +55,12 @@ export default function LancamentoPage() {
   const [outroAberto, setOutroAberto] = useState(false);
   const [outro, setOutro] = useState({ descricao: '', valor: '', observacao: '' });
   const timerAviso = useRef<ReturnType<typeof setTimeout>>();
+  const [quando, setQuando] = useState<Quando>('agora');
+  // A escolha da hora só aparece quando o banco já tem a coluna ocorrido_em.
+  const [horaDisponivel, setHoraDisponivel] = useState(false);
+  useEffect(() => {
+    bancoTemOcorrido(supabaseBrowser()).then(setHoraDisponivel);
+  }, []);
 
   const souResponsavel = perfil?.papel === 'responsavel';
   const podeLancar = !!perfil;
@@ -103,7 +129,9 @@ export default function LancamentoPage() {
     const crianca = criancas.find((c) => c.id === criancaId);
     const pendente = perfil.papel === 'crianca';
     const supabase = supabaseBrowser();
-    const { error } = await supabase.from('lancamentos').insert({
+    const ocorrido = ocorridoEm(quando);
+    const { error } = await inserirLancamento(supabase, {
+      ocorrido_em: ocorrido,
       crianca_id: criancaId,
       lancado_por: perfil.id,
       status: pendente ? 'pendente' : 'aprovado',
@@ -117,14 +145,15 @@ export default function LancamentoPage() {
       return false;
     }
     carregarMovimento();
-    const resumo = `${formatarReal(dados.valor)} · ${dados.descricao} → ${crianca?.nome ?? ''}`;
+    const quandoTexto = quando === 'agora' ? '' : ` (${QUANDO.find((q) => q.id === quando)?.rotulo.toLowerCase()})`;
+    const resumo = `${formatarReal(dados.valor)} · ${dados.descricao} → ${crianca?.nome ?? ''}${quandoTexto}`;
     mostrarAviso({
       texto: pendente ? `${resumo} (aguardando aprovação)` : resumo,
       // Desfazer = estorno: lançamento com valor oposto, para o extrato continuar auditável.
       desfazer: pendente
         ? undefined
         : async () => {
-            const { error: e } = await supabase.from('lancamentos').insert({
+            const { error: e } = await inserirLancamento(supabase, {
               crianca_id: criancaId,
               lancado_por: perfil.id,
               status: 'aprovado',
@@ -132,6 +161,7 @@ export default function LancamentoPage() {
               descricao: `Estorno: ${dados.descricao}`,
               valor: -dados.valor,
               observacao: 'Desfeito no app',
+              ocorrido_em: ocorrido,
             });
             mostrarAviso(e ? { texto: 'Erro ao desfazer.', erro: true } : { texto: 'Lançamento desfeito.' });
             carregarMovimento();
@@ -271,8 +301,27 @@ export default function LancamentoPage() {
         </p>
       )}
 
-      <p className="mt-4 mb-2 text-xs text-slate-500">
+      {horaDisponivel && (
+      <div className="mt-4 flex items-center gap-2">
+        <span className="text-xs text-slate-400 whitespace-nowrap">Aconteceu:</span>
+        <div className="flex flex-1 gap-1 overflow-x-auto">
+          {QUANDO.map((q) => (
+            <button
+              key={q.id}
+              onClick={() => setQuando(q.id)}
+              className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${
+                quando === q.id ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              {q.rotulo}
+            </button>
+          ))}
+        </div>
+      </div>
+      )}
+      <p className="mt-2 mb-2 text-xs text-slate-500">
         Um toque já lança. Errou? Toque em “Desfazer” no aviso que aparece embaixo.
+        {quando !== 'agora' && ' O horário escolhido vale só para as análises; o saldo conta hoje.'}
       </p>
 
       {!termo && favoritos.length > 0 && (

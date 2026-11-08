@@ -134,7 +134,7 @@ export default function DashboardPage() {
     lancamentos.filter((l) => l.crianca_id === id).reduce((acc, l) => acc + Number(l.valor), 0);
   const ehMesAtual = mes === mesAtual();
   const extrato = diaSel
-    ? lancamentosCrianca.filter((l) => new Date(l.criado_em).getDate() === diaSel)
+    ? lancamentosCrianca.filter((l) => new Date(l.ocorrido_em ?? l.criado_em).getDate() === diaSel)
     : lancamentosCrianca;
   // Quanto entrou na poupança por mês, em média, nos últimos 3 fechamentos (sobra/desconto + rendimento).
   const ritmoPoupanca = (id: string): number | null => {
@@ -163,7 +163,12 @@ export default function DashboardPage() {
     <main className="max-w-3xl mx-auto p-4 pb-28 space-y-5">
       <header className="pt-4">
         <h1 className="text-2xl font-bold">{souCrianca ? `Mesada do ${perfil.nome}` : 'Mesada Zon & Ettore'}</h1>
-        <p className="text-sm text-slate-400">Olá, {perfil.nome}</p>
+        <p className="text-sm text-slate-400">
+          Olá, {perfil.nome} ·{' '}
+          <a href="/ajuda" className="underline">
+            como funciona
+          </a>
+        </p>
       </header>
 
       {souResponsavel && !anteriorFechado && (
