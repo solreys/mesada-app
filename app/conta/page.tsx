@@ -98,6 +98,10 @@ export default function ContaPage() {
         </button>
       </form>
 
+      <a href="/ajuda" className="block w-full rounded-lg bg-slate-800 py-2 text-center font-medium text-slate-200">
+        ❓ Como funciona o app
+      </a>
+
       <button onClick={sair} className="w-full rounded-lg bg-slate-800 py-2 font-medium text-slate-200">
         Sair
       </button>

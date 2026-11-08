@@ -163,7 +163,12 @@ export default function DashboardPage() {
     <main className="max-w-3xl mx-auto p-4 pb-28 space-y-5">
       <header className="pt-4">
         <h1 className="text-2xl font-bold">{souCrianca ? `Mesada do ${perfil.nome}` : 'Mesada Zon & Ettore'}</h1>
-        <p className="text-sm text-slate-400">Olá, {perfil.nome}</p>
+        <p className="text-sm text-slate-400">
+          Olá, {perfil.nome} ·{' '}
+          <a href="/ajuda" className="underline">
+            como funciona
+          </a>
+        </p>
       </header>
 
       {souResponsavel && !anteriorFechado && (

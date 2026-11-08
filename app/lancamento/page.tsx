@@ -5,6 +5,7 @@ import { supabaseBrowser } from '@/lib/supabase';
 import type { Perfil, ItemRegra, Lancamento, CategoriaItem } from '@/lib/types';
 import { CORES_CRIANCA, SALDO_INICIAL_MES, formatarReal, intervaloMes, lerValor, mesAtual } from '@/lib/calculos';
 import { usePerfil } from '@/lib/usePerfil';
+import { bancoTemOcorrido, inserirLancamento } from '@/lib/compat';
 
 interface Aviso {
   id: number;
@@ -55,6 +56,11 @@ export default function LancamentoPage() {
   const [outro, setOutro] = useState({ descricao: '', valor: '', observacao: '' });
   const timerAviso = useRef<ReturnType<typeof setTimeout>>();
   const [quando, setQuando] = useState<Quando>('agora');
+  // A escolha da hora só aparece quando o banco já tem a coluna ocorrido_em.
+  const [horaDisponivel, setHoraDisponivel] = useState(false);
+  useEffect(() => {
+    bancoTemOcorrido(supabaseBrowser()).then(setHoraDisponivel);
+  }, []);
 
   const souResponsavel = perfil?.papel === 'responsavel';
   const podeLancar = !!perfil;
@@ -124,7 +130,7 @@ export default function LancamentoPage() {
     const pendente = perfil.papel === 'crianca';
     const supabase = supabaseBrowser();
     const ocorrido = ocorridoEm(quando);
-    const { error } = await supabase.from('lancamentos').insert({
+    const { error } = await inserirLancamento(supabase, {
       ocorrido_em: ocorrido,
       crianca_id: criancaId,
       lancado_por: perfil.id,
@@ -147,7 +153,7 @@ export default function LancamentoPage() {
       desfazer: pendente
         ? undefined
         : async () => {
-            const { error: e } = await supabase.from('lancamentos').insert({
+            const { error: e } = await inserirLancamento(supabase, {
               crianca_id: criancaId,
               lancado_por: perfil.id,
               status: 'aprovado',
@@ -295,6 +301,7 @@ export default function LancamentoPage() {
         </p>
       )}
 
+      {horaDisponivel && (
       <div className="mt-4 flex items-center gap-2">
         <span className="text-xs text-slate-400 whitespace-nowrap">Aconteceu:</span>
         <div className="flex flex-1 gap-1 overflow-x-auto">
@@ -311,6 +318,7 @@ export default function LancamentoPage() {
           ))}
         </div>
       </div>
+      )}
       <p className="mt-2 mb-2 text-xs text-slate-500">
         Um toque já lança. Errou? Toque em “Desfazer” no aviso que aparece embaixo.
         {quando !== 'agora' && ' O horário escolhido vale só para as análises; o saldo conta hoje.'}

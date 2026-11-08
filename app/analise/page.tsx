@@ -18,6 +18,7 @@ import {
   totais,
 } from '@/lib/analise';
 import { usePerfil } from '@/lib/usePerfil';
+import { bancoTemOcorrido } from '@/lib/compat';
 import AbasHistorico from '@/components/AbasHistorico';
 
 const DIA = 86_400_000;
@@ -58,16 +59,18 @@ export default function AnalisePage() {
     if (!perfil) return;
     const supabase = supabaseBrowser();
     (async () => {
+      const campos = `crianca_id, item_id, descricao, valor, criado_em${(await bancoTemOcorrido(supabase)) ? ', ocorrido_em' : ''}`;
       const [p, i, l] = await Promise.all([
         supabase.from('perfis').select('*').eq('papel', 'crianca').order('nome', { ascending: false }),
         supabase.from('itens_regras').select('*'),
         buscarTudo<Lanc>((de, ate) =>
           supabase
             .from('lancamentos')
-            .select('crianca_id, item_id, descricao, valor, criado_em, ocorrido_em')
+            .select(campos)
             .eq('status', 'aprovado')
             .order('criado_em')
             .range(de, ate)
+            .returns<Lanc[]>()
         ),
       ]);
       setCriancas(p.data ?? []);
